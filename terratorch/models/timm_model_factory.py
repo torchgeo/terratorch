@@ -55,12 +55,12 @@ class TimmModelFactory(ModelFactory):
         if pretrained and pretrained is not True:
             try:
                 weights = WeightsEnum(pretrained)
-                state_dict = weights.get_state_dict(progress=True)
+                state_dict = weights.get_state_dict(progress=True, weights_only=True)
             except ValueError:
                 if os.path.exists(pretrained):
                     _, state_dict = utils.extract_backbone(pretrained)
                 else:
-                    state_dict = get_weight(pretrained).get_state_dict(progress=True)
+                    state_dict = get_weight(pretrained).get_state_dict(progress=True, weights_only=True)
             model = utils.load_state_dict(model, state_dict)
 
         return TimmModelWrapper(model)
