@@ -219,9 +219,10 @@ class TerramindSegmentationIOProcessor(IOProcessor):
             # TODO: Check if there's a better way of getting the data in the correct data type ouf of the box.
             multi_modal_data = {mod: tensor.to(torch.float16) for mod, tensor in reshaped_tile.items()}
 
-            # after v0.14.0 vLLM has changed the input structure for multimodal data
-            if check_vllm_version("0.14.0", ">"):
-                multi_modal_data = {"image": multi_modal_data}
+            # Wrap in {"image": ...} as required by vLLM's multimodal input structure.
+            # The version check was unreliable for dev installs; this path is always
+            # correct for the vLLM versions this plugin supports (>= 0.14.0).
+            multi_modal_data = {"image": multi_modal_data}
 
             prompt = {"prompt_token_ids": [1], "multi_modal_data": multi_modal_data}
 
