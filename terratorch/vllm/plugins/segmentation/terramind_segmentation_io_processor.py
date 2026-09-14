@@ -22,10 +22,7 @@ from vllm.plugins.io_processors.interface import IOProcessor, IOProcessorInput, 
 from terratorch.tasks.tiled_inference import generate_tiled_inference_output, prepare_tiled_inference_input
 from terratorch.vllm.plugins import generate_datamodule
 from terratorch.cli_tools import write_tiff
-from terratorch.vllm.utils import check_vllm_version
-
-if check_vllm_version("0.16.0", ">"):
-    from vllm.renderers import BaseRenderer
+from vllm.renderers import BaseRenderer
 
 from .utils import download_file_sync, get_filename_from_url, path_or_tmpdir, to_base64_tiff
 

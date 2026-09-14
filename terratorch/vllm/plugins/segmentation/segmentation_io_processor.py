@@ -28,10 +28,7 @@ from vllm.outputs import PoolingRequestOutput
 from vllm.plugins.io_processors.interface import IOProcessor, IOProcessorInput, IOProcessorOutput
 
 from terratorch.vllm.plugins import generate_datamodule
-from terratorch.vllm.utils import check_vllm_version
-
-if check_vllm_version("0.16.0", ">"):
-    from vllm.renderers import BaseRenderer
+from vllm.renderers import BaseRenderer
 
 from .types import PluginConfig, RequestData, RequestOutput, SegmentationRequestInfo, TiledInferenceParameters
 
