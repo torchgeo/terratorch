@@ -60,6 +60,7 @@ class GenericNonGeoObjectDetectionDataModule(NonGeoDataModule):
         drop_last: bool = True,
         pin_memory: bool = False,
         class_names: list[str] | None = None,
+        label_offset: int = 0,
         **kwargs: Any,
     ) -> None:
         """Constructor for GenericNonGeoObjectDetectionDataModule.
@@ -95,6 +96,9 @@ class GenericNonGeoObjectDetectionDataModule(NonGeoDataModule):
             drop_last: Whether to drop the last incomplete batch
             pin_memory: Whether to pin memory for faster transfer to GPU
             class_names: List of class names for visualization
+            label_offset: Integer offset added to every label value after loading.
+                Use -1 to convert 1-indexed labels (1, 2, ...) to 0-indexed (0, 1, ...).
+                Defaults to 0 (no change).
         """
         super().__init__(GenericNonGeoObjectDetectionDataset, batch_size, num_workers, **kwargs)
 
@@ -115,6 +119,7 @@ class GenericNonGeoObjectDetectionDataModule(NonGeoDataModule):
         self.drop_last = drop_last
         self.pin_memory = pin_memory
         self.class_names = class_names
+        self.label_offset = label_offset
 
         self.train_label_data_root = train_label_data_root
         self.val_label_data_root = val_label_data_root
@@ -174,6 +179,7 @@ class GenericNonGeoObjectDetectionDataModule(NonGeoDataModule):
                 transform=self.train_transform,
                 no_data_replace=self.no_data_replace,
                 class_names=self.class_names,
+                label_offset=self.label_offset,
             )
 
         if stage in ["fit", "validate"]:
@@ -193,6 +199,7 @@ class GenericNonGeoObjectDetectionDataModule(NonGeoDataModule):
                 transform=self.val_transform,
                 no_data_replace=self.no_data_replace,
                 class_names=self.class_names,
+                label_offset=self.label_offset,
             )
 
         if stage in ["test"]:
@@ -212,6 +219,7 @@ class GenericNonGeoObjectDetectionDataModule(NonGeoDataModule):
                 transform=self.test_transform,
                 no_data_replace=self.no_data_replace,
                 class_names=self.class_names,
+                label_offset=self.label_offset,
             )
 
         if stage in ["predict"] and self.predict_root:
@@ -227,6 +235,7 @@ class GenericNonGeoObjectDetectionDataModule(NonGeoDataModule):
                 transform=self.test_transform,
                 no_data_replace=self.no_data_replace,
                 class_names=self.class_names,
+                label_offset=self.label_offset,
             )
 
     def _dataloader_factory(self, split: str) -> DataLoader[Dict[str, Tensor]]:

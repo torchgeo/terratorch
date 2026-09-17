@@ -1,0 +1,151 @@
+# FCOS + EfficientNet-Lite0, shaped for on-device NPU inference (Pixel 9 / Tensor G4 EdgeTPU).
+#
+# Why this instead of the rf-detr config:
+#   rf-detr cannot run on NNAPI at all. Its graph contains GridSample (deformable attention),
+#   LayerNormalization, Expand, Sin/Cos and ~850 dynamic-shape ops, none of which the EdgeTPU
+#   driver accepts, so the NNAPI EP either refuses the model outright
+#   (ORT_EP_FAIL: "cannot run using the current set of target devices, [google-edgetpu]") or dies
+#   during NNAPI model building (ANEURALNETWORKS_BAD_DATA).
+#
+#   fcos + a CNN backbone + head_norm: batchnorm exports to a graph with *zero* NPU-hostile ops
+#   (verified: 590 nodes, only Conv/Relu/Clip/Concat/Reshape/Transpose/Add/Resize/Slice/Gather,
+#   all in NNAPI's operator set, with fully static output shapes [1, 12240, {2,4,1}]).
+#   Box decoding, score thresholding and NMS stay on the CPU, which is the normal mobile split.
+#
+#   Size: ~4.8M parameters vs ~33M for the rf-detr export (133 MB fp32).
+#
+# Two settings here differ from the rf-detr config for reasons worth knowing:
+#   * batch_size is 16, not 4. BatchNorm needs a reasonable batch to produce stable running
+#     statistics -- detection heads default to GroupNorm precisely because it does not. If you
+#     cannot afford batch 16, prefer `head_norm: none` over `batchnorm` at batch 4.
+#   * backbone_pretrained is true. A 4.8M model trained from scratch on this dataset will
+#     underperform; ImageNet init matters much more here than it did for the 33M rf-detr.
+#     Set to false if the first-run weight download is a problem.
+
+seed_everything: 42
+
+trainer:
+  accelerator: auto
+  strategy: auto
+  devices: 1
+  num_nodes: 1
+  precision: 32-true
+  logger:
+    class_path: TensorBoardLogger
+    init_args:
+      save_dir: /home/romeokienzler/Downloads/trainod/output
+      name: fcos_npu_trainod
+  callbacks:
+    - class_path: LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+    - class_path: ModelCheckpoint
+      init_args:
+        dirpath: /home/romeokienzler/Downloads/trainod/output/checkpoints_fcos_npu
+        mode: max
+        monitor: val_map
+        filename: best-{epoch:02d}
+        save_on_train_epoch_end: true
+        every_n_epochs: 1
+        save_top_k: 3
+  max_epochs: 50
+  check_val_every_n_epoch: 1
+  log_every_n_steps: 20
+  enable_checkpointing: true
+  default_root_dir: /home/romeokienzler/Downloads/trainod/output
+
+data:
+  class_path: terratorch.datamodules.GenericNonGeoObjectDetectionDataModule
+  init_args:
+    batch_size: 16
+    num_workers: 0
+    num_classes: 2
+    label_offset: -1
+    train_data_root: /home/romeokienzler/Downloads/trainod/train_images
+    train_label_data_root: /home/romeokienzler/Downloads/trainod/train_labels
+    train_split: /home/romeokienzler/Downloads/trainod/splits/train.txt
+    val_data_root: /home/romeokienzler/Downloads/trainod/val_images
+    val_label_data_root: /home/romeokienzler/Downloads/trainod/val_labels
+    val_split: /home/romeokienzler/Downloads/trainod/splits/val.txt
+    test_data_root: /home/romeokienzler/Downloads/trainod/test_images
+    test_label_data_root: /home/romeokienzler/Downloads/trainod/test_labels
+    test_split: /home/romeokienzler/Downloads/trainod/splits/test.txt
+    img_grep: '*.png'
+    label_grep: '*.json'
+    train_transform:
+      - class_path: albumentations.Compose
+        init_args:
+          transforms:
+            - class_path: albumentations.HorizontalFlip
+              init_args:
+                p: 0.5
+            - class_path: albumentations.VerticalFlip
+              init_args:
+                p: 0.5
+            - class_path: albumentations.pytorch.transforms.ToTensorV2
+          bbox_params:
+            format: pascal_voc
+            label_fields:
+              - labels
+    val_transform:
+      - class_path: albumentations.Compose
+        init_args:
+          transforms:
+            - class_path: albumentations.pytorch.transforms.ToTensorV2
+          bbox_params:
+            format: pascal_voc
+            label_fields:
+              - labels
+    test_transform:
+      - class_path: albumentations.Compose
+        init_args:
+          transforms:
+            - class_path: albumentations.pytorch.transforms.ToTensorV2
+          bbox_params:
+            format: pascal_voc
+            label_fields:
+              - labels
+
+model:
+  class_path: terratorch.tasks.ObjectDetectionTask
+  init_args:
+    model_factory: ObjectDetectionModelFactory
+    model_args:
+      framework: fcos
+      backbone: timm_efficientnet_lite0
+      backbone_pretrained: true
+      backbone_in_chans: 3
+      in_channels: 3
+      num_classes: 2
+      # GroupNorm in the dense head is the one thing that blocks the NPU: it exports as
+      # Reshape + InstanceNormalization, which has no NNAPI operator. BatchNorm folds into the
+      # preceding convolution at export and vanishes.
+      head_norm: batchnorm
+      necks:
+        # EfficientNet-Lite0 emits 5 levels at [16, 24, 40, 112, 320] channels; drop the
+        # stride-2 level and give the FPN a uniform 128-wide pyramid.
+        - name: SelectIndices
+          indices: [1, 2, 3, 4]
+        - name: FeaturePyramidNetworkNeck
+          out_channel: 128
+      # The factory passes _skip_resize=True to FCOS, so these are inert: the network sees the
+      # tiles at their native size (this dataset is 256x256 throughout, giving FPN levels
+      # 64/32/16/8 and 5440 anchor locations). They are set to 256 to match reality; change the
+      # tile size in preprocessing, not here.
+      framework_min_size: 256
+      framework_max_size: 256
+    freeze_backbone: false
+    freeze_decoder: false
+    iou_threshold: 0.5
+    score_threshold: 0.3
+
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 1e-3
+    weight_decay: 1e-4
+
+lr_scheduler:
+  class_path: torch.optim.lr_scheduler.CosineAnnealingLR
+  init_args:
+    T_max: 50

@@ -67,6 +67,7 @@ class GenericNonGeoObjectDetectionDataset(NonGeoDataset):
         transform: A.Compose | None = None,
         no_data_replace: float | None = None,
         class_names: list[str] | None = None,
+        label_offset: int = 0,
     ) -> None:
         """Constructor for GenericNonGeoObjectDetectionDataset.
 
@@ -96,6 +97,9 @@ class GenericNonGeoObjectDetectionDataset(NonGeoDataset):
             no_data_replace: Replace nan values in input images with this value.
                 If None, does no replacement. Defaults to None.
             class_names: List of class names for plotting. Defaults to None.
+            label_offset: Integer offset added to every label value after loading.
+                Use -1 to convert 1-indexed labels (1, 2, ...) to 0-indexed (0, 1, ...).
+                Defaults to 0 (no change).
         """
         super().__init__()
 
@@ -112,6 +116,7 @@ class GenericNonGeoObjectDetectionDataset(NonGeoDataset):
         self.no_data_replace = no_data_replace
         self.num_classes = num_classes
         self.class_names = class_names or [f"class_{i}" for i in range(num_classes)]
+        self.label_offset = label_offset
 
         self.rgb_indices = rgb_indices if rgb_indices is not None else [0, 1, 2]
         self.dataset_bands = dataset_bands
@@ -234,6 +239,8 @@ class GenericNonGeoObjectDetectionDataset(NonGeoDataset):
         if len(boxes) > 0:
             boxes = torch.tensor(boxes, dtype=torch.float32)
             labels = torch.tensor(labels, dtype=torch.long)
+            if self.label_offset != 0:
+                labels = labels + self.label_offset
         else:
             boxes = torch.zeros((0, 4), dtype=torch.float32)
             labels = torch.zeros((0,), dtype=torch.long)

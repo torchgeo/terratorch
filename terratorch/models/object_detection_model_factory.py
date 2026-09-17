@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torchvision.models.detection
 from torch import nn
+from torchvision.models.detection.fcos import FCOSClassificationHead, FCOSHead, FCOSRegressionHead
 from torchvision.models.detection.retinanet import RetinaNetHead
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.ops import MultiScaleRoIAlign
@@ -23,6 +24,28 @@ from terratorch.registry import MODEL_FACTORY_REGISTRY
 from .utils import TerratorchGeneralizedRCNNTransform, _get_backbone
 
 SUPPORTED_TASKS = ["object_detection"]
+
+HEAD_NORM_LAYERS = ("groupnorm", "batchnorm", "none")
+
+
+def _resolve_head_norm(head_norm: str):
+    """Norm layer used by the dense detection heads of fcos and retinanet.
+
+    "groupnorm" is the torchvision default and stays the default here. "batchnorm" exists for
+    mobile/NPU export: GroupNorm has no NNAPI/EdgeTPU operator and lands in ONNX as
+    Reshape + InstanceNormalization, which fragments the graph into CPU partitions, whereas
+    BatchNorm folds into the preceding convolution and disappears. Note BatchNorm needs a
+    reasonably large batch size to give stable running statistics -- GroupNorm is the default
+    for detection heads precisely because it does not. "none" drops normalisation entirely.
+    """
+    if head_norm not in HEAD_NORM_LAYERS:
+        msg = f"head_norm '{head_norm}' is not valid. Choose one of {HEAD_NORM_LAYERS}."
+        raise ValueError(msg)
+    if head_norm == "groupnorm":
+        return partial(nn.GroupNorm, 32)
+    if head_norm == "batchnorm":
+        return nn.BatchNorm2d
+    return nn.Identity
 
 
 def _check_all_args_used(kwargs):
@@ -47,6 +70,7 @@ class ObjectDetectionModelFactory(ModelFactory):
         framework: str,
         num_classes: int | None = None,
         necks: list[dict] | None = None,
+        head_norm: str = "groupnorm",
         **kwargs,
     ) -> Model:
         """
@@ -129,10 +153,24 @@ class ObjectDetectionModelFactory(ModelFactory):
                 aspect_ratios=aspect_ratios,
             )
 
+            num_anchors = anchor_generator.num_anchors_per_location()[0]
+            head = FCOSHead(combined_backbone.out_channels, num_anchors, num_classes)
+            if head_norm != "groupnorm":
+                # FCOSHead hardcodes GroupNorm by not forwarding norm_layer to its sub-heads,
+                # so rebuild them. box_coder on the outer head is left untouched.
+                norm_layer = _resolve_head_norm(head_norm)
+                head.classification_head = FCOSClassificationHead(
+                    combined_backbone.out_channels, num_anchors, num_classes, norm_layer=norm_layer
+                )
+                head.regression_head = FCOSRegressionHead(
+                    combined_backbone.out_channels, num_anchors, norm_layer=norm_layer
+                )
+
             model = torchvision.models.detection.FCOS(
                 combined_backbone,
                 num_classes,
                 anchor_generator=anchor_generator,
+                head=head,
                 _skip_resize=True,
                 image_mean=np.repeat(0, in_channels),
                 image_std=np.repeat(1, in_channels),
@@ -154,7 +192,7 @@ class ObjectDetectionModelFactory(ModelFactory):
                 combined_backbone.out_channels,
                 anchor_generator.num_anchors_per_location()[0],
                 num_classes,
-                norm_layer=partial(torch.nn.GroupNorm, 32),
+                norm_layer=_resolve_head_norm(head_norm),
             )
 
             model = torchvision.models.detection.RetinaNet(
