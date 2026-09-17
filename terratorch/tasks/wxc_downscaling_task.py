@@ -4,7 +4,7 @@ from typing import Any
 import torch
 from granitewxc.utils.config import ExperimentConfig
 from torch import Tensor, nn
-from torchgeo.trainers import BaseTask
+from torchgeo.tasks import BaseTask
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection
 
 from terratorch.models.model import Model  # , get_factory

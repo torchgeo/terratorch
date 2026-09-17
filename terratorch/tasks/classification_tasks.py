@@ -7,10 +7,10 @@ import torch
 from lightning.pytorch.callbacks import Callback
 from segmentation_models_pytorch.losses import FocalLoss, JaccardLoss
 from torch import Tensor, nn
-from torchgeo.datasets.utils import unbind_samples
 from torchmetrics import ClasswiseWrapper, MetricCollection
 from torchmetrics.classification import MulticlassAccuracy, MulticlassF1Score, MulticlassPrecision, MulticlassRecall
 
+from terratorch.datasets.utils import unbind_samples
 from terratorch.models.model import AuxiliaryHead, Model, ModelOutput
 from terratorch.registry.registry import MODEL_FACTORY_REGISTRY
 from terratorch.tasks.base_task import TerraTorchTask

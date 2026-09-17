@@ -2,7 +2,7 @@ import logging
 
 import torch
 from torch import nn
-from torchgeo.trainers import BaseTask
+from torchgeo.tasks import BaseTask
 
 logger = logging.getLogger(__name__)
 

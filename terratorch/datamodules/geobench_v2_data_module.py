@@ -37,7 +37,7 @@ from matplotlib import patches
 from matplotlib.figure import Figure
 from torch import Tensor, nn
 from torch.utils.data import default_collate
-from torchgeo.datasets.utils import lazy_import, percentile_normalization
+from torchgeo.datasets.utils import lazy_import, quantile_normalization
 
 from terratorch.datasets.transforms import kornia_augmentations_to_callable_with_dict
 
@@ -313,7 +313,7 @@ class GeoBenchV2ObjectDetectionDataModule(GeoBenchObjectDetectionDataModule):
         if image.mean() > 1:
             image = image / 10000
 
-        image = percentile_normalization(image.permute(1, 2, 0).numpy())
+        image = quantile_normalization(image.permute(1, 2, 0)).numpy()
 
         if show_feats != "boxes":
             skimage = lazy_import("skimage")
@@ -644,9 +644,9 @@ class GeoBenchV2SegmentationDataModule(GeoBenchSegmentationDataModule):
             for i in range(n_samples):
                 ax = axes[i, 0]
                 img = images[i] if images.dim() > 3 else images
-                img = rearrange(img, "c h w -> h w c").cpu().numpy()
-                img = percentile_normalization(img, lower=2, upper=98)
-                ax.imshow(img)
+                img = rearrange(img, "c h w -> h w c").cpu()
+                img = quantile_normalization(img, lower=0.02, upper=0.98)
+                ax.imshow(img.numpy())
                 ax.set_title("image")
                 ax.axis("off")
 

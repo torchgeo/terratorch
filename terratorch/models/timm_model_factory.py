@@ -9,7 +9,7 @@ import os
 from timm import create_model
 from torch import nn
 from torchgeo.models import get_weight
-from torchgeo.trainers import utils
+from torchgeo.tasks import utils
 from torchvision.models._api import WeightsEnum
 
 from terratorch.models.model import Model, ModelFactory, ModelOutput

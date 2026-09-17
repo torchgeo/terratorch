@@ -95,6 +95,8 @@ diffusers==0.39.0
     # via terratorch (pyproject.toml)
 docstring-parser==0.18.0
     # via jsonargparse
+duckdb==1.5.5
+    # via tacoreader
 einops==0.8.2
     # via
     #   terratorch (pyproject.toml)
@@ -192,6 +194,8 @@ jsonargparse==4.50.0
     # via
     #   terratorch (pyproject.toml)
     #   torchgeo
+jsonnet==0.22.0
+    # via jsonargparse
 jupyter-client==8.9.1
     # via ipykernel
 jupyter-core==5.9.1
@@ -348,6 +352,8 @@ nvidia-nvshmem-cu13==3.4.5
     # via torch
 nvidia-nvtx==13.0.85
     # via cuda-toolkit
+obstore==0.11.0
+    # via tacoreader
 omegaconf==2.3.1
     # via hydra-core
 opencv-python-headless==5.0.0.93
@@ -417,6 +423,7 @@ pillow==12.3.0
 platformdirs==4.11.3
     # via
     #   jupyter-core
+    #   tacoreader
     #   wandb
 pluggy==1.6.0
     # via
@@ -443,14 +450,19 @@ ptyprocess==0.7.0
 pure-eval==0.2.3
     # via stack-data
 pyarrow==25.0.1
-    # via terratorch (pyproject.toml)
+    # via
+    #   terratorch (pyproject.toml)
+    #   tacoreader
 pycocotools==2.0.11
-    # via terratorch (pyproject.toml)
+    # via
+    #   terratorch (pyproject.toml)
+    #   torchmetrics
 pydantic==2.13.4
     # via
     #   albumentations
     #   lightly
     #   rfdetr
+    #   tacoreader
     #   wandb
 pydantic-core==2.46.4
     # via pydantic
@@ -469,7 +481,9 @@ pygments==2.21.0
     #   pytest
     #   rich
 pyogrio==0.13.0
-    # via geopandas
+    # via
+    #   geopandas
+    #   torchgeo
 pyparsing==3.3.2
     # via
     #   matplotlib
@@ -539,6 +553,7 @@ requests==2.34.2
     #   rfdetr
     #   sunpy
     #   supervision
+    #   torchgeo
     #   wandb
 rfdetr==1.9.3
     # via terratorch (pyproject.toml)
@@ -601,6 +616,10 @@ supervision==0.30.0
     # via rfdetr
 sympy==1.14.0
     # via torch
+tacoreader==2.4.21
+    # via terratorch (pyproject.toml)
+tacozip==0.12.0
+    # via tacoreader
 tensorboard==2.21.0
     # via terratorch (pyproject.toml)
 tensorboard-data-server==0.7.2
@@ -647,7 +666,7 @@ torch==2.13.0
     #   torchvision
 torchaudio==2.11.0
     # via terratorch-surya
-torchgeo==0.9.0
+torchgeo==0.10.0
     # via terratorch (pyproject.toml)
 torchmetrics==1.9.0
     # via
@@ -664,6 +683,7 @@ torchvision==0.28.0
     #   terratorch-surya
     #   timm
     #   torchgeo
+    #   torchmetrics
 tornado==6.5.8
     # via
     #   ipykernel
@@ -680,6 +700,8 @@ tqdm==4.70.0
     #   rfdetr
     #   segmentation-models-pytorch
     #   supervision
+    #   tacoreader
+    #   torchgeo
     #   transformers
 traitlets==5.16.1
     # via
