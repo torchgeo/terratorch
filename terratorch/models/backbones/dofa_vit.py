@@ -260,7 +260,7 @@ def load_dofa_weights(
 
         logging.info(msg)
     elif weights is not None:
-        checkpoint_model = weights.get_state_dict(progress=True)
+        checkpoint_model = weights.get_state_dict(progress=True, weights_only=True)
         allowed_missing_keys = {"fc_norm.weight", "fc_norm.bias", "head.weight", "head.bias"}
         if input_size != 224:
             if "pos_embed" in checkpoint_model and checkpoint_model["pos_embed"].shape != state_dict["pos_embed"].shape:
