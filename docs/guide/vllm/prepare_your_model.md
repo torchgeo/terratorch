@@ -55,6 +55,9 @@ The snippet below shows the structure of the `config.json` file for a Prithvi
             },
             {
               "name": "ReshapeTokensToImage"
+            },
+            {
+              "name": "LearnedInterpolateToPyramidal"
             }
           ]
         },
@@ -183,6 +186,9 @@ follows the standard format for a TerraTorch model configuration.
         },
         {
           "name": "ReshapeTokensToImage"
+        },
+        {
+          "name": "LearnedInterpolateToPyramidal"
         }
       ]
     },
