@@ -195,3 +195,30 @@ def test_create_pixelwise_model_swin(backbone, task, expected, decoder, model_fa
         assert model(model_input).output.shape == expected
 
     gc.collect()
+
+
+@pytest.mark.parametrize("task,expected", PIXELWISE_TASK_EXPECTED_OUTPUT)
+@pytest.mark.parametrize("decoder", ["UperNetDecoder", "UNetDecoder"])
+def test_create_pixelwise_model_gfm_swin(task, expected, decoder, model_factory: EncoderDecoderFactory, model_input):
+    """GFM emits NCHW directly, so unlike the other Swin backbones it needs no PermuteDims neck."""
+    model_args = {
+        "task": task,
+        "backbone": "gfm_swin_base",
+        "decoder": decoder,
+        "backbone_model_bands": PRETRAINED_BANDS,
+        "backbone_pretrained": False,
+    }
+
+    if task == "segmentation":
+        model_args["num_classes"] = NUM_CLASSES
+
+    if decoder == "UNetDecoder":
+        model_args["decoder_channels"] = [512, 256, 128, 64]
+
+    model = model_factory.build_model(**model_args)
+    model.eval()
+
+    with torch.no_grad():
+        assert model(model_input).output.shape == expected
+
+    gc.collect()
