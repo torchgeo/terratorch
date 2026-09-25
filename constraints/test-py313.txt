@@ -307,7 +307,7 @@ numpy==2.5.2
     #   torchvision
     #   transformers
     #   xarray
-nvidia-cublas==13.1.1.3
+nvidia-cublas==13.6.1.10
     # via
     #   cuda-toolkit
     #   nvidia-cudnn-cu13
