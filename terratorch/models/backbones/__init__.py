@@ -8,6 +8,7 @@ import terratorch.models.backbones.identity_backbone
 import terratorch.models.backbones.mmearth_convnextv2
 import terratorch.models.backbones.prithvi_swin
 import terratorch.models.backbones.prithvi_vit
+import terratorch.models.backbones.satmae
 import terratorch.models.backbones.scalemae
 import terratorch.models.backbones.terramind
 import terratorch.models.backbones.torchgeo_resnet
