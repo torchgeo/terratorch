@@ -346,7 +346,7 @@ nvidia-nvjitlink==13.3.33
     #   nvidia-cusparse
 nvidia-nvshmem-cu13==3.4.5
     # via torch
-nvidia-nvtx==13.0.85
+nvidia-nvtx==13.3.29
     # via cuda-toolkit
 omegaconf==2.3.1
     # via hydra-core
