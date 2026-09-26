@@ -1251,7 +1251,7 @@ def load_resnet_weights(
 
         logging.info(msg)
     elif weights is not None:
-        checkpoint_model = weights.get_state_dict(progress=True)
+        checkpoint_model = weights.get_state_dict(progress=True, weights_only=True)
         checkpoint_model = select_patch_embed_weights(
             checkpoint_model, model, pretrained_bands, model_bands, custom_weight_proj
         )

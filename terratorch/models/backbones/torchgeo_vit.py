@@ -411,14 +411,14 @@ def load_vit_weights(
 
         logging.info(msg)
     elif weights is not None:
-        checkpoint_model = weights.get_state_dict(progress=True)
+        checkpoint_model = weights.get_state_dict(progress=True, weights_only=True)
         state_dict = model.state_dict()
-        
+
         for k in ["head.weight", "head.bias"]:
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
                 logging.info(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
-        
+
         checkpoint_model = select_patch_embed_weights(
             checkpoint_model, model, pretrained_bands, model_bands, custom_weight_proj
         )
