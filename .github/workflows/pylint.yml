@@ -7,6 +7,37 @@ on:
     branches: [ "main" ]
 
 jobs:
+  torch-load-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Check torch.load uses weights_only=True
+      run: |
+        python3 - <<'EOF'
+        import ast, subprocess, sys
+
+        bad = []
+        for path in subprocess.check_output(["git", "ls-files", "*.py"], text=True).split():
+            for node in ast.walk(ast.parse(open(path).read(), path)):
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "torch"
+                    and node.func.attr == "load"
+                    and not any(
+                        kw.arg == "weights_only"
+                        and isinstance(kw.value, ast.Constant)
+                        and kw.value.value is True
+                        for kw in node.keywords
+                    )
+                ):
+                    bad.append(f"{path}:{node.lineno}")
+
+        if bad:
+            print("torch.load() without weights_only=True:\n" + "\n".join(bad))
+            sys.exit(1)
+        EOF
   build:
     runs-on: ubuntu-latest
     strategy:

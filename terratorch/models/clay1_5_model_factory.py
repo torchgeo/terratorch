@@ -227,7 +227,7 @@ def _resolve_checkpoint(checkpoint_path: str | None) -> str | None:
 
 def _load_encoder_weights(encoder: nn.Module, ckpt_path: str) -> None:
     logger.info(f"Loading encoder weights from {ckpt_path}")
-    checkpoint = torch.load(ckpt_path, map_location="cpu")
+    checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=True)
     state_dict = checkpoint.get("state_dict", checkpoint)
     # Clay v1.5 checkpoints store the full ClayMAE under "model.encoder.*"
     prefix = "model.encoder."
