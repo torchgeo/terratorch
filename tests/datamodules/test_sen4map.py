@@ -128,3 +128,25 @@ def test_sen4map_datamodule(dummy_sen4map_data_root, dummy_sen4map_keys):
     test_batch  = next(iter(test_loader))
     assert "image" in test_batch, "Missing 'image' in test batch"
     assert "label"  in test_batch, "Missing 'mask'  in test batch"
+
+
+class _Malicious:
+    def __init__(self, path):
+        self.path = path
+
+    def __reduce__(self):
+        return (open, (self.path, "w"))
+
+
+def test_sen4map_rejects_unsafe_keys_file(tmp_path):
+    from terratorch.datamodules import Sen4MapLucasDataModule
+
+    marker = tmp_path / "pwned"
+    keys_path = tmp_path / "keys.pkl"
+    for payload, error in [(_Malicious(str(marker)), pickle.UnpicklingError), ({"key": "value"}, ValueError)]:
+        with open(keys_path, "wb") as f:
+            pickle.dump(payload, f)
+        dm = Sen4MapLucasDataModule(0, 0, train_hdf5_keys_path=keys_path)
+        with pytest.raises(error):
+            dm.setup("fit")
+    assert not marker.exists()
