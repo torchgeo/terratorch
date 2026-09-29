@@ -9,6 +9,11 @@ from terratorch.datasets import Sen4MapDatasetMonthlyComposites
 
 
 class _KeysUnpickler(pickle.Unpickler):
+    """Unpickler that refuses to load any function or class, so only plain data can be loaded.
+
+    Follows the approach recommended in the official pickle docs: https://docs.python.org/3/library/pickle.html#restricting-globals
+    """
+
     def find_class(self, module, name):
         raise pickle.UnpicklingError(f"Forbidden global '{module}.{name}' in HDF5 keys file.")
 
