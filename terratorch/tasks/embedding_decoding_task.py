@@ -7,7 +7,7 @@ import joblib
 import numpy as np
 import torch
 from torch import Tensor, nn
-from torchgeo.trainers import BaseTask
+from torchgeo.tasks import BaseTask
 from torchmetrics import MetricCollection
 from torchmetrics.classification import (
     MultilabelAccuracy,

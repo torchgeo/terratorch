@@ -13,11 +13,11 @@ import torch
 import torch.nn.functional as F
 from lightning.pytorch.callbacks import Callback
 from torch import Tensor, nn
-from torchgeo.datasets.utils import unbind_samples
 from torchmetrics import ClasswiseWrapper, MeanAbsoluteError, MeanSquaredError, MetricCollection, R2Score
 from torchmetrics.metric import Metric
 from torchmetrics.wrappers.abstract import WrapperMetric
 
+from terratorch.datasets.utils import unbind_samples
 from terratorch.models.model import AuxiliaryHead, Model, ModelOutput
 from terratorch.registry.registry import MODEL_FACTORY_REGISTRY
 from terratorch.tasks.base_task import TerraTorchTask
@@ -483,7 +483,7 @@ class PixelwiseRegressionTask(TerraTorchTask):
                         summary_writer.log_figure(
                             self.logger.run_id, fig, f"epoch_{self.current_epoch}_{batch_idx}.png"
                         )
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
             finally:
                 plt.close()
@@ -812,7 +812,7 @@ class ScalarRegressionTask(TerraTorchTask):
                         summary_writer.log_figure(
                             self.logger.run_id, fig, f"epoch_{self.current_epoch}_{batch_idx}.png"
                         )
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
             finally:
                 plt.close()

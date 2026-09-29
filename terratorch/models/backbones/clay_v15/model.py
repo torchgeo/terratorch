@@ -1,5 +1,4 @@
 import math
-import os
 import random
 
 import timm
@@ -13,8 +12,11 @@ from terratorch.models.backbones.clay_v15.backbone import Transformer
 from terratorch.models.backbones.clay_v15.factory import DynamicEmbedding
 from terratorch.models.backbones.clay_v15.utils import posemb_sincos_2d_with_gsd
 
-torch.set_float32_matmul_precision("medium")
-os.environ["TORCH_CUDNN_V8_API_DISABLED"] = "1"
+# NOTE: Do not mutate global torch/env state at import time. Both
+# ``torch.set_float32_matmul_precision`` and ``TORCH_CUDNN_V8_API_DISABLED``
+# are process-wide, so merely importing this module changed numerics for
+# every other model in the same process. Set the ``terratorch_FLOAT_32_PRECISION``
+# env var (see ``terratorch.cli_tools``) to opt into reduced precision instead.
 
 
 class Encoder(nn.Module):

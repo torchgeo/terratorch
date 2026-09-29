@@ -35,7 +35,7 @@ from lightning.pytorch import LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.callbacks import BasePredictionWriter, ModelCheckpoint, RichProgressBar
 from lightning.pytorch.cli import ArgsType, LightningArgumentParser, LightningCLI, SaveConfigCallback
 from torch.utils.data import DataLoader
-from torchgeo.trainers import BaseTask
+from torchgeo.tasks import BaseTask
 from tqdm import tqdm
 
 import terratorch.datamodules

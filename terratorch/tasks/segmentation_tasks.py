@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import segmentation_models_pytorch as smp
 import torch
 from torch import Tensor, nn
-from torchgeo.datasets.utils import unbind_samples
 from torchmetrics import ClasswiseWrapper, MetricCollection
 from torchmetrics.classification import MulticlassAccuracy, MulticlassF1Score, MulticlassJaccardIndex
 
+from terratorch.datasets.utils import unbind_samples
 from terratorch.models.model import AuxiliaryHead, ModelOutput
 from terratorch.registry import MODEL_FACTORY_REGISTRY
 from terratorch.tasks.base_task import TerraTorchTask

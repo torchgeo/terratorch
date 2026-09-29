@@ -1,7 +1,7 @@
 # Copyright contributors to the Terratorch project
 
 import os
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from enum import Enum
 from functools import partial
 from pathlib import Path
@@ -212,7 +212,9 @@ def clip_image(img: np.ndarray) -> np.ndarray:
 
 def clip_image_percentile(img: np.ndarray, q_lower: float = 1, q_upper: float = 99) -> np.ndarray:
     """Remove values outside percentile range [lower, upper] and rescale image.
-       Based on torchgeo.datasets.utils.percentile_normalization().
+
+    Standalone numpy implementation based on ``np.percentile``; intentionally
+    independent of torchgeo's normalization helpers.
 
     Args:
         img (np.ndarray): image in the format HWC.
@@ -334,3 +336,30 @@ def extract_georeference(path: Path) -> dict[str, Any] | None:
             }
     except Exception:
         return None
+
+
+def unbind_samples(sample: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Reverse of ``stack_samples``, tolerant of non-tensor values.
+
+    torchgeo 0.10 made :func:`torchgeo.datasets.utils.unbind_samples` call
+    ``torch.unbind`` unconditionally, which raises ``TypeError`` on non-tensor batch
+    entries such as the list of strings under ``filename``. Sequence values are indexed
+    positionally here instead, matching torchgeo <= 0.9 behaviour.
+
+    Args:
+        sample: a mini-batch of samples.
+
+    Returns:
+        A list of samples.
+    """
+    uncollated = {
+        key: torch.unbind(values) if isinstance(values, torch.Tensor) else values
+        for key, values in sample.items()
+    }
+    keys = [
+        key
+        for key, values in uncollated.items()
+        if isinstance(values, Sequence) and not isinstance(values, str | bytes)
+    ]
+    n = min((len(uncollated[key]) for key in keys), default=0)
+    return [{key: uncollated[key][i] for key in keys} for i in range(n)]

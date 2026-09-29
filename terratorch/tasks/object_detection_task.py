@@ -13,12 +13,13 @@ import matplotlib.pyplot as plt
 import torch
 from matplotlib.figure import Figure
 from torch import Tensor
-from torchgeo.datasets import RGBBandsMissingError, unbind_samples
-from torchgeo.trainers import BaseTask
+from torchgeo.datasets import RGBBandsMissingError
+from torchgeo.tasks import BaseTask
 from torchmetrics import MetricCollection
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from torchvision.ops import nms
 
+from terratorch.datasets.utils import unbind_samples
 from terratorch.registry import MODEL_FACTORY_REGISTRY
 from terratorch.tasks.loss_handler import LossHandler
 from terratorch.tasks.optimizer_factory import optimizer_factory
@@ -346,9 +347,9 @@ class ObjectDetectionTask(BaseTask):
                     batch["prediction_masks"] = [b.unsqueeze(1) for b in batch["prediction_masks"]]
 
             batch["image"] = batch["image"].cpu()
-            sample = unbind_samples(batch)[0]
             fig: Figure | None = None
             try:
+                sample = unbind_samples(batch)[0]
                 if hasattr(self.trainer.datamodule, "val_dataset"):
                     if hasattr(self.trainer.datamodule.val_dataset, "plot") and hasattr(
                         self.trainer.datamodule.val_dataset, "plot"
@@ -359,7 +360,7 @@ class ObjectDetectionTask(BaseTask):
                 elif hasattr(self.trainer.datamodule, "plot") and callable(self.trainer.datamodule.plot):
                     fig = self.trainer.datamodule.plot(sample)
 
-            except RGBBandsMissingError:
+            except (RGBBandsMissingError, ValueError, TypeError):
                 pass
 
             if fig:

@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import torch
 from lightning.pytorch.callbacks import Callback
 from torch import nn
-from torchgeo.datasets.utils import unbind_samples
-from torchgeo.trainers import BaseTask
+from torchgeo.tasks import BaseTask
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection
 
+from terratorch.datasets.utils import unbind_samples
 from terratorch.models.model import Model, ReconstructionOutput
 from terratorch.registry import MODEL_FACTORY_REGISTRY
 from terratorch.tasks.loss_handler import LossHandler
@@ -297,7 +297,7 @@ class ReconstructionTask(BaseTask):
                         summary_writer.log_figure(
                             self.logger.run_id, fig, f"epoch_{self.current_epoch}_{batch_idx}.png"
                         )
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
             finally:
                 plt.close()

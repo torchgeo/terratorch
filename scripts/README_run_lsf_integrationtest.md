@@ -303,6 +303,22 @@ When running tests in distributed environments with limited disk quotas:
    `--cleanup-tox-venv` to automatically delete these environments after test
    completion.
 
+3. **virtualenv app_data**: `VIRTUALENV_APP_DATA` is **always set** to
+   `$TOX_WORK_DIR/virtualenv_app_data`, keeping virtualenv's seed wheel images on
+   the same shared filesystem as the checkout. Left at its default it writes to
+   the home cache directory, and on a cluster whose home fileset is quota-limited
+   every job then fails within seconds of starting:
+
+   ```
+   OSError: [Errno 122] Disk quota exceeded
+   ```
+
+   This happens during environment seeding, so it looks like a wholesale test
+   failure — all jobs exit with code 2 having run no test code at all. If you see
+   that, check the home quota (`dd if=/dev/zero of=$HOME/probe bs=1M count=20`)
+   before suspecting the code under test. Note that Hugging Face model downloads
+   still default to `~/.cache/huggingface`; set `HF_HOME` if home is tight.
+
 ### Environment Variables
 
 The following environment variables are set based on command-line options:
@@ -313,6 +329,8 @@ The following environment variables are set based on command-line options:
   environments.
 - `PIP_NO_CACHE_DIR=1`: Always set to disable pip package caching in distributed
   environments.
+- `VIRTUALENV_APP_DATA`: Always set to `$TOX_WORK_DIR/virtualenv_app_data` to keep
+  virtualenv's seed wheel images off the (often quota-limited) home fileset.
 - `TEST_BRANCH`: Set to the branch name. When set, tox environments clone from
   GitHub instead of using local code.
 - `TERRATORCH_TMP_ROOT`: Set when `--terratorch-tmp-root` is provided. Specifies

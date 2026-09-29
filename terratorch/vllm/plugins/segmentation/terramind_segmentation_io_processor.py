@@ -22,10 +22,7 @@ from vllm.plugins.io_processors.interface import IOProcessor, IOProcessorInput, 
 from terratorch.tasks.tiled_inference import generate_tiled_inference_output, prepare_tiled_inference_input
 from terratorch.vllm.plugins import generate_datamodule
 from terratorch.cli_tools import write_tiff
-from terratorch.vllm.utils import check_vllm_version
-
-if check_vllm_version("0.16.0", ">"):
-    from vllm.renderers import BaseRenderer
+from vllm.renderers import BaseRenderer
 
 from .utils import download_file_sync, get_filename_from_url, path_or_tmpdir, to_base64_tiff
 
@@ -219,9 +216,10 @@ class TerramindSegmentationIOProcessor(IOProcessor):
             # TODO: Check if there's a better way of getting the data in the correct data type ouf of the box.
             multi_modal_data = {mod: tensor.to(torch.float16) for mod, tensor in reshaped_tile.items()}
 
-            # after v0.14.0 vLLM has changed the input structure for multimodal data
-            if check_vllm_version("0.14.0", ">"):
-                multi_modal_data = {"image": multi_modal_data}
+            # Wrap in {"image": ...} as required by vLLM's multimodal input structure.
+            # The version check was unreliable for dev installs; this path is always
+            # correct for the vLLM versions this plugin supports (>= 0.14.0).
+            multi_modal_data = {"image": multi_modal_data}
 
             prompt = {"prompt_token_ids": [1], "multi_modal_data": multi_modal_data}
 

@@ -85,3 +85,23 @@ jobs:
         run: |
           python -m twine check dist/*
           python -m twine upload dist/* --non-interactive
+
+      # Without this the tag and the PyPI upload are the only record of a release,
+      # and the Releases page silently falls behind (it stalled at v1.2.10 while
+      # v1.2.11 through v1.2.13 shipped to PyPI).
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+
+          if gh release view "$TAG" --json id >/dev/null 2>&1; then
+            echo "Release $TAG already exists, uploading artifacts only."
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --title "$TAG" \
+              --generate-notes \
+              --latest \
+              --verify-tag
+          fi

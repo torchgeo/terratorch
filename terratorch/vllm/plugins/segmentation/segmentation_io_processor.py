@@ -28,10 +28,7 @@ from vllm.outputs import PoolingRequestOutput
 from vllm.plugins.io_processors.interface import IOProcessor, IOProcessorInput, IOProcessorOutput
 
 from terratorch.vllm.plugins import generate_datamodule
-from terratorch.vllm.utils import check_vllm_version
-
-if check_vllm_version("0.16.0", ">"):
-    from vllm.renderers import BaseRenderer
+from vllm.renderers import BaseRenderer
 
 from .types import PluginConfig, RequestData, RequestOutput, SegmentationRequestInfo, TiledInferenceParameters
 
@@ -416,14 +413,10 @@ class SegmentationIOProcessor(IOProcessor):
                 "pixel_values": window.to(torch.float16)[0],
             }
             # not all models use location coordinates, so we don't bother sending them to vLLM if not needed
-            if "location_coords" in self.model_config["input"]["data"]:
+            if "location_coords" in self.model_config["input"]["data"] and location_coords is not None:
                 multi_modal_data["location_coords"] = location_coords
 
-            # after v0.14.0 vLLM has changed the input structure for multimodal data
-            if check_vllm_version("0.14.0", ">"):
-                multi_modal_data = {"image": multi_modal_data}
-
-            prompt = {"prompt_token_ids": [1], "multi_modal_data": multi_modal_data}
+            prompt = {"prompt_token_ids": [1], "multi_modal_data": {"image": multi_modal_data}}
 
             prompts.append(prompt)
 

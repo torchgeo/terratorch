@@ -58,10 +58,7 @@ dependencies = [
   "lightning>=2.6.0",
   "segmentation-models-pytorch>=0.5.0",
   "jsonargparse>=4.40.0",
-  # torchgeo 0.10 removed torchgeo.trainers.utils (imported in timm_model_factory.py)
-  # and made other breaking API changes; 0.9.x is the verified-compatible line. Without
-  # an upper bound a fresh install resolves 0.10 and fails at import. See issue #912.
-  "torchgeo>=0.9.0,<0.10",
+  "torchgeo>=0.10,<0.11",
   "einops",
   "timm>=1.0.15",
   "pycocotools",
@@ -112,6 +109,7 @@ test = [
   "hdf5plugin",
   "h5netcdf",
   "terratorch-surya>=0.1.0",
+  "tacoreader>=2.4.0",
 #  "PrithviWxC",  # Currently fails of pypi version conflics
 #  "granitewxc",  # Currently fails of pypi version conflics
 ]

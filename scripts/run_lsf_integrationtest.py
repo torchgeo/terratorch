@@ -230,6 +230,22 @@ def check_job_status(output_dir):
     print("=" * 100)
 
 
+def build_cache_exports(tox_work_dir, disable_pip_cache):
+    """Build the export string for the caches tox and virtualenv write to.
+
+    virtualenv keeps its seed wheel images in an app_data directory that defaults
+    to the user's home cache. On clusters where the home fileset is quota-limited
+    that quota is usually the first thing to run out, and every job then dies with
+    "OSError: [Errno 122] Disk quota exceeded" while seeding the environment,
+    before a single test runs. Pinning app_data beside the tox work directory
+    keeps it on the same (large) shared filesystem as the checkout.
+    """
+    exports = f" && export VIRTUALENV_APP_DATA={tox_work_dir}/virtualenv_app_data"
+    if disable_pip_cache:
+        exports += " && export UV_NO_CACHE=1 && export PIP_NO_CACHE_DIR=1"
+    return exports
+
+
 def build_test_command(
     activate_cmd,
     branch_name,
@@ -244,7 +260,7 @@ def build_test_command(
     # Only export TEST_BRANCH if it's set (allows testing local code when not set)
     branch_export = f" && export TEST_BRANCH={branch_name}" if branch_name else ""
     cleanup_export = " && export CLEANUP_VENV=1" if cleanup_venv else ""
-    cache_exports = " && export UV_NO_CACHE=1 && export PIP_NO_CACHE_DIR=1" if disable_pip_cache else ""
+    cache_exports = build_cache_exports(tox_work_dir, disable_pip_cache)
     return f"/bin/bash -c 'set -e; {activate_cmd}{branch_export} && export TEST_FUNCTION={test_name} && export TOX_WORK_DIR={tox_work_dir}{env_exports}{cleanup_export}{cache_exports} && tox -r -e integration-tests-base-set-{python_version}; exit $?'"
 
 
@@ -258,8 +274,7 @@ def build_vllm_command(
         exports = f"export TEST_BRANCH={branch_name} && {exports}"
     if cleanup_venv:
         exports += " && export CLEANUP_VENV=1"
-    if disable_pip_cache:
-        exports += " && export UV_NO_CACHE=1 && export PIP_NO_CACHE_DIR=1"
+    exports += build_cache_exports(tox_work_dir, disable_pip_cache)
     return f"/bin/bash -c 'set -e; {activate_cmd} && {exports} && tox -r -e {tox_env}-{python_version}; exit $?'"
 
 
