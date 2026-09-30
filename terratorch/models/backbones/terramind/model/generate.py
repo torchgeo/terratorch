@@ -513,7 +513,7 @@ class GenerationSampler(nn.Module):
             else:
                 return top_samples, top_indices
         else:
-            return self.sample_tokens(logits, num_select, temperature, top_k, top_p, return_all_samples)
+            return self.select_tokens(logits, num_select, temperature, top_k, top_p, return_all_samples)
 
     def forward_mask_encoder_generation(self, encoder_mod_dict):
         """Modification of forward_mask_encoder adapted for generation, with support for batching"""
