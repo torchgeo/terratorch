@@ -1,6 +1,4 @@
-import ast
 import json
-import pickle
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -15,6 +13,7 @@ from torchgeo.datasets import NonGeoDataset
 from terratorch.datasets.utils import (
     clip_image,
     default_transform,
+    load_geobench_label,
     validate_bands,
 )
 
@@ -110,8 +109,7 @@ class MSo2SatNonGeo(NonGeoDataset):
             bands = [np.array(h5file[key]) for key in keys]
 
             image = np.stack(bands, axis=-1)
-            attr_dict = pickle.loads(ast.literal_eval(h5file.attrs["pickle"]))
-            class_index = attr_dict["label"]
+            class_index = load_geobench_label(h5file)
 
         output = {"image": image.astype(np.float32)}
 
