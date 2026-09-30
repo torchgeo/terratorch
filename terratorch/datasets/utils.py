@@ -126,7 +126,10 @@ class _Ignored:
         pass
 
 class _GeoBenchUnpickler(pickle.Unpickler):
-    """Unpickler restricted to globals used in GEO-Bench HDF5 metadata."""
+    """Unpickler restricted to globals used in GEO-Bench HDF5 metadata.
+
+    Follows the approach recommended in the official pickle docs: https://docs.python.org/3/library/pickle.html#restricting-globals
+    """
 
     def find_class(self, module, name):
         if module == "geobench.dataset" or (module, name) in _GEOBENCH_ALLOWED_GLOBALS:
