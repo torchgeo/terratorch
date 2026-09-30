@@ -1,6 +1,9 @@
 # Copyright contributors to the Terratorch project
 
+import ast
+import io
 import os
+import pickle
 from collections.abc import Iterator, Mapping, Sequence
 from enum import Enum
 from functools import partial
@@ -104,6 +107,42 @@ class Modalities(Enum):
 
 def default_transform(**batch):
     return to_tensor(batch)
+
+
+_GEOBENCH_ALLOWED_GLOBALS = {
+    ("affine", "Affine"),
+    ("datetime", "date"),
+    ("numpy", "dtype"),
+    ("numpy.core.multiarray", "scalar"),
+    ("numpy._core.multiarray", "scalar"),
+}
+
+
+class _Ignored:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __setstate__(self, state):
+        pass
+
+class _GeoBenchUnpickler(pickle.Unpickler):
+    """Unpickler restricted to globals used in GEO-Bench HDF5 metadata."""
+
+    def find_class(self, module, name):
+        if module == "geobench.dataset" or (module, name) in _GEOBENCH_ALLOWED_GLOBALS:
+            return _Ignored
+        raise pickle.UnpicklingError(f"Global '{module}.{name}' is forbidden in GEO-Bench HDF5 metadata.")
+
+
+def load_geobench_label(h5file) -> int:
+    """Read the label from the 'pickle' attribute of a GEO-Bench HDF5 file."""
+    data = ast.literal_eval(h5file.attrs["pickle"])
+    attrs = _GeoBenchUnpickler(io.BytesIO(data)).load()
+
+    if not isinstance(attrs, dict) or not isinstance(attrs.get("label"), int):
+        raise ValueError("HDF5 'pickle' attribute must be a dict with an integer 'label'.")
+
+    return attrs["label"]
 
 
 def generate_bands_intervals(bands_intervals: list[int | str | HLSBands | tuple[int]] | None = None):
