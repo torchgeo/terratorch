@@ -80,13 +80,17 @@ model:
     model_factory: EncoderDecoderFactory
     model_args:
       backbone: prithvi_eo_tiny
-      backbone_out_indices:
-        - 2
-        - 5
-        - 8
-        - 11
       decoder: UperNetDecoder
       decoder_channels: 128
+      necks:
+        - name: SelectIndices
+          indices:
+            - 2
+            - 5
+            - 8
+            - 11
+        - name: ReshapeTokensToImage
+        - name: LearnedInterpolateToPyramidal
       backbone_bands:
       - RED
       - GREEN
