@@ -12,6 +12,40 @@ class DecoderNotFoundError(Exception):
     pass
 
 
+# Modules the removed `UperNetDecoder(scale_modules=True)` used to create inside the decoder.
+# They are now provided by the `LearnedInterpolateToPyramidal` neck.
+LEGACY_SCALE_MODULE_NAMES = ("fpn1", "fpn2", "fpn3", "fpn4")
+
+
+def register_legacy_scale_modules_hook(model: nn.Module, neck_index: int) -> None:
+    """Make checkpoints trained with the removed `scale_modules` option loadable.
+
+    Those checkpoints store the pyramidal projections as `decoder.fpn1` ... `decoder.fpn4`.
+    The very same modules are now built by the `LearnedInterpolateToPyramidal` neck, so their
+    weights are renamed to `neck.<neck_index>.fpn*` while the state dict is being loaded.
+
+    Args:
+        model (nn.Module): Model owning both the `neck` and the `decoder` submodules.
+        neck_index (int): Position of the `LearnedInterpolateToPyramidal` neck in the neck sequence.
+    """
+
+    decoder = getattr(model, "decoder", None)
+
+    def rename_legacy_scale_modules(state_dict, prefix, *args, **kwargs):  # noqa: ARG001
+        for name in LEGACY_SCALE_MODULE_NAMES:
+            if hasattr(decoder, name):
+                # this decoder owns a module of that name, the weights are not the neck's
+                continue
+            legacy_prefix = f"{prefix}decoder.{name}."
+            neck_prefix = f"{prefix}neck.{neck_index}.{name}."
+            for key in [k for k in state_dict if k.startswith(legacy_prefix)]:
+                value = state_dict.pop(key)
+                # a key already stored under the neck name always wins over the legacy one
+                state_dict.setdefault(neck_prefix + key[len(legacy_prefix) :], value)
+
+    model._register_load_state_dict_pre_hook(rename_legacy_scale_modules)
+
+
 def extract_prefix_keys(d: dict, prefix: str) -> dict:
     extracted_dict = {}
     remaining_dict = {}

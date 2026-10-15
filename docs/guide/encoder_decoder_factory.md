@@ -92,6 +92,28 @@ Not all encoders and decoders are compatible. Below we include some caveats.
 Some decoders expect pyramidal outputs, but some encoders do not produce such outputs (e.g. vanilla ViT models).
 In this case, the [InterpolateToPyramidal][terratorch.models.necks.InterpolateToPyramidal], [MaxpoolToPyramidal][terratorch.models.necks.MaxpoolToPyramidal] and [LearnedInterpolateToPyramidal][terratorch.models.necks.LearnedInterpolateToPyramidal] necks may be particularly useful.
 
+### Migrating from `decoder_scale_modules`
+
+`UperNetDecoder` used to build the pyramidal projections itself when `decoder_scale_modules: true`
+was passed. That option was removed: the same modules are now provided by the
+[LearnedInterpolateToPyramidal][terratorch.models.necks.LearnedInterpolateToPyramidal] neck.
+
+Old configs keep working. `decoder_scale_modules: true` appends that neck automatically and emits a
+deprecation warning, and checkpoints that stored those weights as `decoder.fpn1` ... `decoder.fpn4`
+are remapped onto the neck while loading, so published models load unchanged. To migrate a config,
+drop `decoder_scale_modules` and append the neck explicitly:
+
+```yaml
+model_args:
+  decoder: UperNetDecoder
+  decoder_channels: 256
+  necks:
+    - name: SelectIndices
+      indices: [5, 11, 17, 23]
+    - name: ReshapeTokensToImage
+    - name: LearnedInterpolateToPyramidal  # replaces decoder_scale_modules: true
+```
+
 ### SMP decoders
 
 Not all decoders are guaranteed to work with all encoders without additional necks.

@@ -1,5 +1,6 @@
 # Copyright contributors to the Terratorch project
 
+import inspect
 import logging
 import warnings
 from typing import List
@@ -14,11 +15,11 @@ from terratorch.models.model import (
     Model,
     ModelFactory,
 )
-from terratorch.models.necks import Neck, NeckSequential, build_neck_list
+from terratorch.models.necks import LearnedInterpolateToPyramidal, Neck, NeckSequential, build_neck_list
 from terratorch.models.peft_utils import get_peft_backbone
 from terratorch.models.pixel_wise_model import PixelWiseModel
 from terratorch.models.scalar_output_model import ScalarOutputModel
-from terratorch.models.utils import TemporalWrapper, extract_prefix_keys
+from terratorch.models.utils import TemporalWrapper, extract_prefix_keys, register_legacy_scale_modules_hook
 from terratorch.registry import BACKBONE_REGISTRY, DECODER_REGISTRY, MODEL_FACTORY_REGISTRY
 
 from .utils import _get_backbone
@@ -82,6 +83,57 @@ def _get_decoder_and_head_kwargs(
             head_kwargs[key] = num_outputs
 
     return DECODER_REGISTRY.build(decoder, channel_list, **decoder_kwargs), head_kwargs, includes_head
+
+
+SCALE_MODULES_KEY = "scale_modules"
+SCALE_MODULES_NECK = "LearnedInterpolateToPyramidal"
+SCALE_MODULES_DEPRECATION_MSG = (
+    "`decoder_scale_modules` is deprecated and was removed from UperNetDecoder. A "
+    f"`{SCALE_MODULES_NECK}` neck was appended to `necks` instead, which builds the very same "
+    "modules and produces the same output. Update your config to declare that neck explicitly "
+    "and drop `decoder_scale_modules`."
+)
+SCALE_MODULES_REDUNDANT_MSG = (
+    "`decoder_scale_modules` is deprecated and was ignored, because `necks` already declares a "
+    f"`{SCALE_MODULES_NECK}` neck. Drop `decoder_scale_modules` from your config."
+)
+
+
+def _decoder_handles_scale_modules(decoder: str | nn.Module | None) -> bool:
+    """Whether the decoder still accepts `scale_modules` itself, so no migration is needed."""
+    if decoder is None or isinstance(decoder, nn.Module):
+        return False
+    try:
+        decoder_class = DECODER_REGISTRY.find_class(decoder)
+        return SCALE_MODULES_KEY in inspect.signature(decoder_class).parameters
+    except Exception:  # noqa: BLE001 - unknown decoders are handled further down the line
+        return False
+
+
+def _pop_scale_modules(decoder_kwargs: dict | None, kwargs: dict) -> tuple[bool, dict | None]:
+    """Drop the deprecated scale_modules flag, reporting whether it was enabled.
+
+    `kwargs` is this factory's own dict and is edited in place; `decoder_kwargs` belongs to the
+    caller, so a copy without the flag is returned instead.
+    """
+    enabled = bool(kwargs.pop(f"decoder_{SCALE_MODULES_KEY}", False))
+    if decoder_kwargs and SCALE_MODULES_KEY in decoder_kwargs:
+        enabled = bool(decoder_kwargs[SCALE_MODULES_KEY]) or enabled
+        decoder_kwargs = {k: v for k, v in decoder_kwargs.items() if k != SCALE_MODULES_KEY}
+    return enabled, decoder_kwargs
+
+
+def _uses_aux_scale_modules(aux_decoders: list[AuxiliaryHead] | None) -> bool:
+    """Whether any auxiliary decoder enables the deprecated scale_modules flag.
+
+    The flag is not removed here: auxiliary arguments are copied further down, so it is dropped
+    from that copy rather than from the caller's dict.
+    """
+    return any(
+        (aux_decoder.decoder_args or {}).get(f"decoder_{SCALE_MODULES_KEY}", False)
+        and not _decoder_handles_scale_modules(aux_decoder.decoder)
+        for aux_decoder in aux_decoders or []
+    )
 
 
 def _check_all_args_used(kwargs):
@@ -199,6 +251,21 @@ class EncoderDecoderFactory(ModelFactory):
 
         if necks is None:
             necks = []
+
+        # backwards compatibility: configs and checkpoints predating the removal of
+        # `UperNetDecoder(scale_modules=True)` are migrated to the equivalent neck
+        scale_modules = False
+        if not _decoder_handles_scale_modules(decoder):
+            scale_modules, decoder_kwargs = _pop_scale_modules(decoder_kwargs, kwargs)
+            scale_modules = _uses_aux_scale_modules(aux_decoders) or scale_modules
+        if scale_modules:
+            if any(neck.get("name") == SCALE_MODULES_NECK for neck in necks):
+                # the config was migrated already, the leftover flag would scale the features twice
+                warnings.warn(SCALE_MODULES_REDUNDANT_MSG, DeprecationWarning, stacklevel=2)
+            else:
+                warnings.warn(SCALE_MODULES_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+                necks = [*necks, {"name": SCALE_MODULES_NECK}]
+
         neck_list, channel_list = build_neck_list(necks, out_channels)
 
         # some decoders already include a head
@@ -236,6 +303,9 @@ class EncoderDecoderFactory(ModelFactory):
                 args = aux_decoder.decoder_args if aux_decoder.decoder_args else {}
                 aux_decoder_kwargs, args = extract_prefix_keys(args, "decoder_")
                 aux_head_kwargs, args = extract_prefix_keys(args, "head_")
+                if not _decoder_handles_scale_modules(aux_decoder.decoder):
+                    # already handled by the neck the main decoder migration appended
+                    aux_decoder_kwargs.pop(SCALE_MODULES_KEY, None)
                 aux_decoder_instance, aux_head_kwargs, aux_decoder_includes_head = _get_decoder_and_head_kwargs(
                     aux_decoder.decoder,
                     channel_list,
@@ -298,8 +368,10 @@ def _build_appropriate_model(
         neck_module: nn.Module = NeckSequential(*necks)
     else:
         neck_module = None
+
+    model = None
     if task in PIXEL_WISE_TASKS:
-        return PixelWiseModel(
+        model = PixelWiseModel(
             task,
             backbone,
             decoder,
@@ -313,7 +385,7 @@ def _build_appropriate_model(
             auxiliary_heads=auxiliary_heads,
         )
     elif task in SCALAR_TASKS:
-        return ScalarOutputModel(
+        model = ScalarOutputModel(
             task,
             backbone,
             decoder,
@@ -326,9 +398,25 @@ def _build_appropriate_model(
         )
 
     elif task in EMBEDDING_GENERATION:
-        return EmbeddingOutputModel(
+        model = EmbeddingOutputModel(
             backbone,
             patch_size=patch_size,
             padding=padding,
             neck=neck_module,
         )
+
+    if model is not None:
+        _support_legacy_scale_modules_checkpoints(model, necks)
+
+    return model
+
+
+def _support_legacy_scale_modules_checkpoints(model: nn.Module, necks: list[Neck] | None) -> None:
+    """Accept checkpoints that stored the pyramidal projections inside the decoder.
+
+    Before `scale_modules` was removed from UperNetDecoder, those weights were saved as
+    `decoder.fpn1` ... `decoder.fpn4`. They belong to the `LearnedInterpolateToPyramidal` neck now.
+    """
+    neck_indices = [i for i, neck in enumerate(necks or []) if isinstance(neck, LearnedInterpolateToPyramidal)]
+    if len(neck_indices) == 1:
+        register_legacy_scale_modules_hook(model, neck_indices[0])
