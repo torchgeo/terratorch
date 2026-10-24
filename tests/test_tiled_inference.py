@@ -13,9 +13,11 @@ import torch
 import pytest
 
 from terratorch.tasks.tiled_inference import (
+    BlendingSink,
     InferenceInput,
     InMemoryTileSource,
     InMemoryTileSink,
+    MemmapTileSink,
     TileSource,
     TileSink,
     tiled_inference,
@@ -313,3 +315,96 @@ class TestSourceAndSinkCombined:
         assert result is None
         assert len(snk.received) > 0
         assert len(src.calls) == len(snk.received)
+
+    def test_pure_out_of_core_without_input_batch(self):
+        """tiled_inference runs purely out-of-core with input_batch=None, a custom source, and BlendingSink."""
+        full_img = _image(batch=1, channels=4, h=128, w=128)
+        pad_delta = 4
+        # Padded reference image simulating reading from a padded store / window
+        padded_img = torch.nn.functional.pad(
+            full_img, (pad_delta, pad_delta, pad_delta, pad_delta), mode="reflect"
+        )
+
+        class LazyWindowSource:
+            def __call__(self, tile: InferenceInput) -> torch.Tensor:
+                r, c = tile.input_coords
+                # Read from the coordinate window
+                return padded_img[tile.batch, :, r.start - pad_delta : r.stop + pad_delta, c.start - pad_delta : c.stop + pad_delta]
+
+        model = _make_identity_model(out_channels=2)
+        params = dict(h_crop=64, w_crop=64, h_stride=48, w_stride=48, delta=4, padding="reflect")
+
+        # In-memory baseline
+        expected = tiled_inference(model, full_img, **params)
+
+        # Pure out-of-core run with input_batch=None
+        actual = tiled_inference(
+            model,
+            input_batch=None,
+            source=LazyWindowSource(),
+            h_img=128,
+            w_img=128,
+            input_batch_size=1,
+            **params,
+        )
+
+        assert isinstance(actual, torch.Tensor)
+        assert actual.shape == (1, 2, 128, 128)
+        assert torch.allclose(expected, actual, atol=1e-5)
+
+    def test_blending_sink_subclassing(self):
+        """Users can easily subclass BlendingSink to stream final outputs without re-implementing blending."""
+        img = _image(h=128, w=128)
+        model = _make_identity_model(out_channels=2)
+
+        saved_files = []
+
+        class CustomDiskSink(BlendingSink):
+            def finalize(self):
+                result = super().finalize()
+                saved_files.append(result)
+                return None
+
+        sink = CustomDiskSink(input_batch_size=1, h_img=128, w_img=128, delta=4, padding="reflect")
+        result = tiled_inference(
+            model,
+            img,
+            h_crop=64,
+            w_crop=64,
+            h_stride=48,
+            w_stride=48,
+            delta=4,
+            padding="reflect",
+            sink=sink,
+        )
+
+        assert result is None
+        assert len(saved_files) == 1
+        assert saved_files[0].shape == (1, 2, 128, 128)
+
+    def test_memmap_tile_sink_directly(self):
+        """MemmapTileSink satisfies the TileSink protocol and produces correct blended output."""
+        sink = MemmapTileSink(input_batch_size=1, h_img=128, w_img=128, delta=4, padding="reflect")
+        assert isinstance(sink, TileSink)
+
+        img = _image(h=128, w=128)
+        model = _make_identity_model(out_channels=2)
+        params = dict(h_crop=64, w_crop=64, h_stride=48, w_stride=48, delta=4, padding="reflect")
+
+        res_mem = tiled_inference(model, img, accumulator="memory", **params)
+        res_disk = tiled_inference(model, img, sink=sink, **params)
+
+        assert isinstance(res_disk, torch.Tensor)
+        assert torch.allclose(res_mem, res_disk, atol=1e-5)
+
+    def test_disk_accumulator_matches_memory(self):
+        """tiled_inference with accumulator='disk' produces identical output without RAM canvas."""
+        img = _image(h=128, w=128)
+        model = _make_identity_model(out_channels=2)
+        params = dict(h_crop=64, w_crop=64, h_stride=48, w_stride=48, delta=4, padding="reflect")
+
+        res_mem = tiled_inference(model, img, accumulator="memory", **params)
+        res_disk = tiled_inference(model, img, accumulator="disk", **params)
+
+        assert isinstance(res_disk, torch.Tensor)
+        assert torch.allclose(res_mem, res_disk, atol=1e-5)

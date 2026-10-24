@@ -16,7 +16,10 @@ import torch
 from matplotlib.figure import Figure
 from torch import Tensor
 from torchgeo.datasets import BioMassters
-from torchgeo.datasets.utils import quantile_normalization
+try:
+    from torchgeo.datasets.utils import quantile_normalization
+except ImportError:
+    from torchgeo.datasets.utils import percentile_normalization as quantile_normalization
 
 from terratorch.datasets.generic_multimodal_dataset import MultimodalToTensor
 from terratorch.datasets.transforms import MultimodalTransforms

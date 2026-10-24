@@ -27,12 +27,14 @@ accumulated in RAM before being averaged and returned.
 """
 
 import math
+import tempfile
 import warnings
 from abc import abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+import numpy as np
 import torch
 import tqdm
 
@@ -119,30 +121,16 @@ class TileSink(Protocol):
             sink.write(chip, prediction)
         result = sink.finalize()
 
-    Example – write to a file::
+    Example – write to a file using :class:`BlendingSink`::
 
-        class RasterioSink:
-            def __init__(self, path, profile, h_img, w_img, n_classes):
-                import rasterio
-                self._acc  = torch.zeros(1, n_classes, h_img, w_img)
-                self._cnt  = torch.zeros(1, h_img, w_img)
+        class RasterioSink(BlendingSink):
+            def __init__(self, path, profile, h_img, w_img, delta=0, padding=False):
+                super().__init__(input_batch_size=1, h_img=h_img, w_img=w_img, delta=delta, padding=padding)
                 self._path = path
                 self._profile = profile
 
-            def write(self, tile: InferenceInput, prediction: torch.Tensor) -> None:
-                if tile.output_crop is not None:
-                    prediction = prediction[...,
-                                            tile.output_crop[0],
-                                            tile.output_crop[1]]
-                self._acc[tile.batch, :,
-                          tile.input_coords[0],
-                          tile.input_coords[1]] += prediction * tile.blend_mask
-                self._cnt[tile.batch,
-                          tile.input_coords[0],
-                          tile.input_coords[1]] += tile.blend_mask
-
             def finalize(self):
-                result = self._acc / self._cnt.unsqueeze(1)
+                result = super().finalize()
                 import rasterio
                 with rasterio.open(self._path, "w", **self._profile) as dst:
                     dst.write(result[0].numpy())
@@ -155,7 +143,8 @@ class TileSink(Protocol):
 
         ``prediction`` is a CPU tensor already transferred from the inference
         device.  ``tile`` provides the destination coordinates and blend mask.
-        The sink is responsible for any blending / averaging it wants to apply.
+        The sink is responsible for any blending / averaging it wants to apply
+        (or can inherit from :class:`BlendingSink` to let the library handle it).
 
         Args:
             tile: The :class:`InferenceInput` descriptor for this chip.
@@ -190,29 +179,26 @@ class InMemoryTileSource:
     """
 
     def __call__(self, tile: "InferenceInput") -> torch.Tensor:
+        if tile.input_data is None:
+            raise ValueError("tile.input_data is None in InMemoryTileSource.")
         return tile.input_data
 
 
-class InMemoryTileSink:
-    """Default :class:`TileSink` that accumulates all chips into a single tensor.
+class BlendingSink:
+    """Base class for sinks that handles patch cropping, blend weighting, and accumulation.
 
-    This reproduces the original behaviour of :func:`tiled_inference`:
-
-    * chips are weighted by their blend mask and summed,
-    * :meth:`finalize` divides by the accumulated blend weights (or just
-      returns the last-written value when ``average_patches=False``),
-    * padding is stripped and the tensor is transferred to ``device``.
+    Custom sinks can inherit from this class to avoid re-implementing edge cropping,
+    blend mask multiplication, and normalization math.
 
     Args:
         input_batch_size: Number of images in the batch.
-        h_img: Height of the output canvas *before* padding removal.
-        w_img: Width of the output canvas *before* padding removal.
-        delta: Border width used for padding; set to 0 when ``padding`` is
-            ``False``.
-        device: Device to which the final tensor is moved.
+        h_img: Height of the original unpadded image canvas.
+        w_img: Width of the original unpadded image canvas.
+        delta: Border width used for padding; set to 0 when ``padding`` is ``False``.
+        device: Device to which the final tensor is moved (default: "cpu").
         padding: The padding mode that was used (or ``False``).
         average_patches: If ``True``, overlapping areas are averaged using
-            the blend mask.  If ``False``, later chips overwrite earlier ones.
+            the blend mask. If ``False``, later chips overwrite earlier ones.
     """
 
     def __init__(
@@ -220,10 +206,10 @@ class InMemoryTileSink:
         input_batch_size: int,
         h_img: int,
         w_img: int,
-        delta: int,
-        device: "str | torch.device",
-        padding: "str | bool",
-        average_patches: bool,
+        delta: int = 0,
+        device: "str | torch.device" = "cpu",
+        padding: "str | bool" = "reflect",
+        average_patches: bool = True,
     ) -> None:
         self._input_batch_size = input_batch_size
         self._h_img = h_img
@@ -247,12 +233,19 @@ class InMemoryTileSink:
         self._preds_count = torch.zeros(self._input_batch_size, h, w)
 
     def write(self, tile: "InferenceInput", prediction: torch.Tensor) -> None:
+        """Process and accumulate a single predicted chip.
+
+        Crops the prediction with `tile.output_crop` and weights it with `tile.blend_mask`.
+        """
         if self._preds is None:
             out_channels = 1 if len(prediction.shape) == 2 else prediction.shape[0]
             self._init_accumulators(out_channels)
 
         if tile.output_crop is not None:
             prediction = prediction[..., tile.output_crop[0], tile.output_crop[1]]
+
+        if self._preds is None or self._preds_count is None:
+            raise RuntimeError("Accumulators not initialized.")
 
         if self._average_patches:
             self._preds[
@@ -276,8 +269,9 @@ class InMemoryTileSink:
         ] += tile.blend_mask
 
     def finalize(self) -> torch.Tensor:
-        if self._preds is None:
-            raise RuntimeError("No chips were written to InMemoryTileSink.")
+        """Finalize accumulation, remove padding, normalize by blend weights, and return."""
+        if self._preds is None or self._preds_count is None:
+            raise RuntimeError("No chips were written to the sink.")
 
         preds = self._preds
         preds_count = self._preds_count
@@ -296,6 +290,100 @@ class InMemoryTileSink:
             output = output / preds_count.unsqueeze(1)
 
         return output.to(self._device)
+
+
+class InMemoryTileSink(BlendingSink):
+    """Default :class:`TileSink` that accumulates all chips into a single tensor in memory."""
+    pass
+
+
+class MemmapTileSink(BlendingSink):
+    """Tile sink backed by memory-mapped files on disk.
+
+    Useful when accumulating predictions for very large images that exceed RAM.
+    Predictions and blend counts are memory-mapped to temporary files.
+
+    Args:
+        input_batch_size: Number of images in the batch.
+        h_img: Height of the original unpadded image canvas.
+        w_img: Width of the original unpadded image canvas.
+        delta: Border width used for padding; set to 0 when ``padding`` is ``False``.
+        device: Device to which the final tensor is moved (default: "cpu").
+        padding: The padding mode that was used (or ``False``).
+        average_patches: If ``True``, overlapping areas are averaged using
+            the blend mask. If ``False``, later chips overwrite earlier ones.
+        tmp_dir: Directory where temporary files are stored (default: system temp dir).
+    """
+
+    def __init__(
+        self,
+        input_batch_size: int,
+        h_img: int,
+        w_img: int,
+        delta: int = 0,
+        device: "str | torch.device" = "cpu",
+        padding: "str | bool" = "reflect",
+        average_patches: bool = True,
+        tmp_dir: str | None = None,
+    ) -> None:
+        super().__init__(
+            input_batch_size=input_batch_size,
+            h_img=h_img,
+            w_img=w_img,
+            delta=delta,
+            device=device,
+            padding=padding,
+            average_patches=average_patches,
+        )
+        self._tmp_dir = tmp_dir
+        self._preds_file = None
+        self._preds_count_file = None
+        self._preds_np: np.memmap | None = None
+        self._preds_count_np: np.memmap | None = None
+
+    def _init_accumulators(self, out_channels: int) -> None:
+        if self._padding:
+            h = self._h_img + 2 * self._delta
+            w = self._w_img + 2 * self._delta
+        else:
+            h, w = self._h_img, self._w_img
+
+        self._preds_file = tempfile.NamedTemporaryFile(dir=self._tmp_dir)
+        self._preds_count_file = tempfile.NamedTemporaryFile(dir=self._tmp_dir)
+
+        preds_shape = (self._input_batch_size, out_channels, h, w)
+        counts_shape = (self._input_batch_size, h, w)
+
+        self._preds_np = np.memmap(
+            self._preds_file, dtype=np.float32, mode="w+", shape=preds_shape
+        )
+        self._preds_count_np = np.memmap(
+            self._preds_count_file, dtype=np.float32, mode="w+", shape=counts_shape
+        )
+        self._preds = torch.from_numpy(self._preds_np)
+        self._preds_count = torch.from_numpy(self._preds_count_np)
+
+    def close(self) -> None:
+        """Clean up temporary memory-mapped files."""
+        self._preds = None
+        self._preds_count = None
+        self._preds_np = None
+        self._preds_count_np = None
+        if self._preds_file is not None:
+            try:
+                self._preds_file.close()
+            except Exception:
+                pass
+            self._preds_file = None
+        if self._preds_count_file is not None:
+            try:
+                self._preds_count_file.close()
+            except Exception:
+                pass
+            self._preds_count_file = None
+
+    def __del__(self) -> None:
+        self.close()
 
 
 def get_blend_mask(
@@ -339,33 +427,55 @@ def get_blend_mask(
 class InferenceInput:
     batch: int
     input_coords: tuple[slice, slice]
-    input_data: torch.Tensor
+    input_data: torch.Tensor | None
     blend_mask: torch.Tensor
     output_crop: None | tuple[slice, slice]
 
 
 def get_input_chips(
-    input_batch, h_crop, h_stride, w_crop, w_stride, delta, blend_overlaps, padding
+    input_batch: torch.Tensor | None,
+    h_crop: int,
+    h_stride: int,
+    w_crop: int,
+    w_stride: int,
+    delta: int,
+    blend_overlaps: bool,
+    padding: str | bool,
+    h_img: int | None = None,
+    w_img: int | None = None,
+    input_batch_size: int = 1,
 ) -> list[InferenceInput]:
     """
     Create input chips of type InferenceInput for tiled inference. These contain:
       0. batch
       1. Coordinates where this should end up in the preds
-      2. output/input
+      2. output/input data (optional when using a custom TileSource)
       3. Blend mask for weighting the edges of the chips
       4. Optionally, for inputs, how to crop the output
     """
+    if input_batch is not None:
+        input_batch_size = input_batch.shape[0]
+
+        if padding:
+            w_pad, h_pad = delta, delta
+
+            if len(input_batch.shape) > 4:
+                # Ignore additional during padding (e.g. with multi-temporal input)
+                add_dim = [0, 0] * (len(input_batch.shape) - 4)
+            else:
+                add_dim = []
+
+            input_batch = torch.nn.functional.pad(input_batch, (w_pad, w_pad, h_pad, h_pad, *add_dim), mode=padding)
+        h_img, w_img = input_batch.shape[-2:]
+    else:
+        if h_img is None or w_img is None:
+            raise ValueError("h_img and w_img must be provided when input_batch is None.")
+        if padding:
+            # Adjust dimensions for virtual padded image
+            h_img = h_img + 2 * delta
+            w_img = w_img + 2 * delta
+
     if padding:
-        w_pad, h_pad = delta, delta
-
-        if len(input_batch.shape) > 4:
-            # Ignore additional during padding (e.g. with multi-temporal input)
-            add_dim = [0, 0] * (len(input_batch.shape) - 4)
-        else:
-            add_dim = []
-
-        input_batch = torch.nn.functional.pad(input_batch, (w_pad, w_pad, h_pad, h_pad, *add_dim), mode=padding)
-
         border_output_crop = (slice(delta, h_crop - delta), slice(delta, w_crop - delta))
     else:
         border_output_crop = None
@@ -381,21 +491,18 @@ def get_input_chips(
             inner_blend_mask if padding else torch.ones((h_crop, w_crop), device="cpu", dtype=torch.float)
         )
 
-    input_batch_size = input_batch.shape[0]
-    h_img, w_img = input_batch.shape[-2:]
-
     # Stage 1: deal with border patches (using border settings and subtract delta from coords only if padding is used)
     # Deal with patches near the right border
     coordinates_and_inputs: list[InferenceInput] = []
     for i in range(0, h_img - h_crop - 1, h_stride):
-        patch = input_batch[..., i : i + h_crop, w_img - w_crop : w_img]
+        patch = input_batch[..., i : i + h_crop, w_img - w_crop : w_img] if input_batch is not None else None
         coordinates_and_inputs += [
             InferenceInput(
                 b,
                 (slice(i + delta, i + h_crop - delta), slice(w_img - w_crop + delta, w_img - delta))
                 if padding
                 else (slice(i, i + h_crop), slice(w_img - w_crop, w_img)),
-                patch[b],
+                patch[b] if patch is not None else None,
                 border_blend_mask,
                 border_output_crop,
             )
@@ -404,14 +511,14 @@ def get_input_chips(
 
     # Deal with patches near the bottom of the image
     for i in range(0, w_img - w_crop - 1, w_stride):
-        patch = input_batch[..., h_img - h_crop : h_img, i : i + w_crop]
+        patch = input_batch[..., h_img - h_crop : h_img, i : i + w_crop] if input_batch is not None else None
         coordinates_and_inputs += [
             InferenceInput(
                 b,
                 (slice(h_img - h_crop + delta, h_img - delta), slice(i + delta, i + w_crop - delta))
                 if padding
                 else (slice(h_img - h_crop, h_img), slice(i, i + w_crop)),
-                patch[b],
+                patch[b] if patch is not None else None,
                 border_blend_mask,
                 border_output_crop,
             )
@@ -419,14 +526,14 @@ def get_input_chips(
         ]
 
     # Deal with last patches at the right bottom of the image
-    patch = input_batch[..., h_img - h_crop : h_img, w_img - w_crop : w_img]
+    patch = input_batch[..., h_img - h_crop : h_img, w_img - w_crop : w_img] if input_batch is not None else None
     coordinates_and_inputs += [
         InferenceInput(
             b,
             (slice(h_img - h_crop + delta, h_img - delta), slice(w_img - w_crop + delta, w_img - delta))
             if padding
             else (slice(h_img - h_crop, h_img), slice(w_img - w_crop, w_img)),
-            patch[b],
+            patch[b] if patch is not None else None,
             border_blend_mask,
             border_output_crop,
         )
@@ -435,7 +542,7 @@ def get_input_chips(
 
     for row in range(0, h_img - h_crop - 1, h_stride):
         for col in range(0, w_img - w_crop - 1, w_stride):
-            patch = input_batch[..., row : row + h_crop, col : col + w_crop]
+            patch = input_batch[..., row : row + h_crop, col : col + w_crop] if input_batch is not None else None
             if row == 0 or col == 0:
                 # Add patches along the left and top of the image
                 coordinates_and_inputs += [
@@ -444,7 +551,7 @@ def get_input_chips(
                         (slice(row + delta, row + h_crop - delta), slice(col + delta, col + w_crop - delta))
                         if padding
                         else (slice(row, row + h_crop), slice(col, col + w_crop)),
-                        patch[b],
+                        patch[b] if patch is not None else None,
                         border_blend_mask,
                         border_output_crop,
                     )
@@ -456,7 +563,7 @@ def get_input_chips(
                     InferenceInput(
                         b,
                         (slice(row + delta, row + h_crop - delta), slice(col + delta, col + w_crop - delta)),
-                        patch[b],
+                        patch[b] if patch is not None else None,
                         inner_blend_mask,
                         inner_output_crop,
                     )
@@ -467,7 +574,7 @@ def get_input_chips(
 
 
 def prepare_tiled_inference_input(
-    input_batch: torch.Tensor,
+    input_batch: torch.Tensor | dict | None = None,
     out_channels: int | None = None,
     crop: int = 224,
     stride: int = 192,
@@ -478,8 +585,11 @@ def prepare_tiled_inference_input(
     h_stride: int | None = None,
     w_stride: int | None = None,
     padding: str | bool = "reflect",
-    device: str | None = None,
-) -> tuple[list[InferenceInput], Callable[[torch.Tensor], dict | torch.Tensor], int, int, int, str | torch.device]:
+    device: str | torch.device | None = None,
+    h_img: int | None = None,
+    w_img: int | None = None,
+    input_batch_size: int = 1,
+) -> tuple[list[InferenceInput], Callable[[torch.Tensor], dict | torch.Tensor], int, int, int, str | torch.device, int]:
 
     if isinstance(input_batch, dict):
         # Handle dict inputs for tiled inference
@@ -523,18 +633,26 @@ def prepare_tiled_inference_input(
                 out = {m: t[..., s : s + l, :, :, :] for m, s, l in zip(modalities, channel_start, channel_length)}
             return out
 
+        input_batch_size = input_batch.shape[0]
+        h_img, w_img = input_batch.shape[-2:]
+        ret_device = device or input_batch.device
+        input_batch = input_batch.cpu()
+
     elif isinstance(input_batch, torch.Tensor):
         # Dummy function if input is a tensor
         tensor_reshape = lambda x: x
+        input_batch_size = input_batch.shape[0]
+        h_img, w_img = input_batch.shape[-2:]
+        ret_device = device or input_batch.device
+        input_batch = input_batch.cpu()
+
+    elif input_batch is None:
+        tensor_reshape = lambda x: x
+        if h_img is None or w_img is None:
+            raise ValueError("When input_batch is None, h_img and w_img must be provided.")
+        ret_device = device or "cpu"
     else:
-        raise ValueError("input for tiled inference must be either a torch.Tensor or a dict of torch.Tensors")
-
-    input_batch_size = input_batch.shape[0]
-    h_img, w_img = input_batch.shape[-2:]
-    ret_device = device or input_batch.device
-
-    # Move inputs to CPU to avoid out-of-memory errors
-    input_batch = input_batch.cpu()
+        raise ValueError("input for tiled inference must be either a torch.Tensor, a dict of torch.Tensors, or None")
 
     h_crop = h_crop or crop
     w_crop = w_crop or crop
@@ -553,7 +671,17 @@ def prepare_tiled_inference_input(
 
     # Get smaller inputs
     coordinates_and_inputs = get_input_chips(
-        input_batch, h_crop, h_stride, w_crop, w_stride, delta, blend_overlaps, padding
+        input_batch=input_batch,
+        h_crop=h_crop,
+        h_stride=h_stride,
+        w_crop=w_crop,
+        w_stride=w_stride,
+        delta=delta,
+        blend_overlaps=blend_overlaps,
+        padding=padding,
+        h_img=h_img,
+        w_img=w_img,
+        input_batch_size=input_batch_size,
     )
 
     return coordinates_and_inputs, tensor_reshape, input_batch_size, h_img, w_img, ret_device, delta
@@ -641,6 +769,10 @@ def tiled_inference(
     device: str | None = None,
     source: "TileSource | None" = None,
     sink: "TileSink | None" = None,
+    h_img: int | None = None,
+    w_img: int | None = None,
+    input_batch_size: int = 1,
+    accumulator: str = "memory",
     **kwargs,
 ) -> "torch.Tensor | None":
     """
@@ -651,8 +783,8 @@ def tiled_inference(
     Args:
         model_forward (Callable): Callable that returns the output of the model.
         input_batch (torch.Tensor | dict | None): Input batch to be processed.
-            May be ``None`` when a custom *source* is provided that does not
-            need a pre-loaded tensor.
+            May be ``None`` when a custom *source* is provided that reads
+            on demand. When ``None``, *h_img* and *w_img* should be specified.
         out_channels (int): Number of output channels. Deprecated.
         inference_parameters (TiledInferenceParameters): Parameters to be used for inference.
             Deprecated, please pass the parameters directly to tiled_inference.
@@ -671,28 +803,28 @@ def tiled_inference(
             Deactivate padding with False. Defaults to reflect.
         device (str | None): Device for inference. Inferred from *input_batch* when not given.
         source (TileSource | None): Optional callable that returns the chip tensor for a
-            given :class:`InferenceInput` descriptor.  When provided, the
-            ``input_data`` stored on the descriptor (which comes from the
-            pre-sliced *input_batch*) is ignored in favour of what the source
-            returns.  This enables on-demand, out-of-core reading.
+            given :class:`InferenceInput` descriptor. When provided, chips are read
+            on-demand, enabling out-of-core reading without loading full tensors into RAM.
 
             The source receives the full :class:`InferenceInput` (including
             ``input_coords``) so it can map coordinates to a file window.
             It must return a CPU tensor of shape ``(C, H, W)`` or
             ``(C, T, H, W)``.
-
-            When *source* is given, *input_batch* can be a dummy tensor that
-            carries only shape / device metadata (``source`` is responsible for
-            the actual data), or it can still be the real tensor – the source
-            will simply override the chip data.
         sink (TileSink | None): Optional object that receives each predicted
             chip via :meth:`~TileSink.write` and is asked to produce the final
-            result via :meth:`~TileSink.finalize`.  Use this to write
-            predictions incrementally (e.g. to a GeoTIFF) instead of building
-            a large in-memory accumulator.
+            result via :meth:`~TileSink.finalize`. Use this (or subclass
+            :class:`BlendingSink`) to write predictions incrementally (e.g. to a GeoTIFF)
+            instead of building a large in-memory accumulator.
 
             When *sink* is ``None`` (the default) an :class:`InMemoryTileSink`
             is used, which replicates the original behaviour.
+        h_img (int | None): Height of the input image, required when *input_batch* is ``None``.
+        w_img (int | None): Width of the input image, required when *input_batch* is ``None``.
+        input_batch_size (int): Batch size, used when *input_batch* is ``None`` (default: 1).
+        accumulator (str): Accumulator backend to use when *sink* is not provided.
+            ``"memory"`` (default) accumulates in RAM via :class:`InMemoryTileSink`.
+            ``"disk"`` or ``"memmap"`` accumulates on disk using memory-mapped temporary files
+            via :class:`MemmapTileSink`.
 
     Returns:
         torch.Tensor | None: The result of the inference, or ``None`` if the
@@ -721,12 +853,13 @@ def tiled_inference(
     h_crop = h_crop or crop
     w_crop = w_crop or crop
 
-    # If the input already fits within a single chip, skip tiling and run a single forward pass.
-    sample_tensor = next(iter(input_batch.values())) if isinstance(input_batch, dict) else input_batch
-    h_img, w_img = sample_tensor.shape[-2:]
-    if h_img <= h_crop and w_img <= w_crop:
-        with torch.no_grad():
-            return model_forward(input_batch, **kwargs)
+    # If input_batch is given and already fits within a single chip, skip tiling and run a single forward pass.
+    if input_batch is not None:
+        sample_tensor = next(iter(input_batch.values())) if isinstance(input_batch, dict) else input_batch
+        h_img_curr, w_img_curr = sample_tensor.shape[-2:]
+        if h_img_curr <= h_crop and w_img_curr <= w_crop:
+            with torch.no_grad():
+                return model_forward(input_batch, **kwargs)
 
     coordinates_and_inputs, tensor_reshape, input_batch_size, h_img, w_img, device, delta = (
         prepare_tiled_inference_input(
@@ -742,16 +875,29 @@ def tiled_inference(
             blend_overlaps=blend_overlaps,
             padding=padding,
             device=device,
+            h_img=h_img,
+            w_img=w_img,
+            input_batch_size=input_batch_size,
         )
     )
 
     # Resolve source: default to reading pre-sliced chip from the descriptor.
     effective_source: TileSource = source if source is not None else InMemoryTileSource()
 
-    # Resolve sink: default to the classic in-memory accumulator.
+    # Resolve sink: default to the classic in-memory accumulator or disk memmap.
     effective_sink: TileSink
     if sink is not None:
         effective_sink = sink
+    elif accumulator in ("disk", "memmap"):
+        effective_sink = MemmapTileSink(
+            input_batch_size=input_batch_size,
+            h_img=h_img,
+            w_img=w_img,
+            delta=delta,
+            device=device,
+            padding=padding,
+            average_patches=average_patches,
+        )
     else:
         effective_sink = InMemoryTileSink(
             input_batch_size=input_batch_size,

@@ -14,7 +14,10 @@ import torch
 from matplotlib.figure import Figure
 from torch import Tensor
 from torchgeo.datasets import RGBBandsMissingError
-from torchgeo.tasks import BaseTask
+try:
+    from torchgeo.trainers import BaseTask
+except ImportError:
+    from torchgeo.tasks import BaseTask
 from torchmetrics import MetricCollection
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from torchvision.ops import nms
