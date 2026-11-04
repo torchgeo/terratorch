@@ -56,7 +56,7 @@ jobs:
         run: |
           pip install pip==25.1
           pip --version
-          pip install -e .[test,tortilla] -c constraints/test-py313.txt
+          pip install -e .[test,tortilla,logging] -c constraints/test-py313.txt
       - name: List pip dependencies
         run: pip list
       - name: Test with pytest (fast)
@@ -89,7 +89,7 @@ jobs:
         run: |
           pip install pip==25.1
           pip --version
-          pip install -e .[test,tortilla] -c constraints/test-py313.txt
+          pip install -e .[test,tortilla,logging] -c constraints/test-py313.txt
       - name: Test with pytest (slow)
         run: |
           # pytest exit code 5 == "no tests collected". The only slow-marked tests
