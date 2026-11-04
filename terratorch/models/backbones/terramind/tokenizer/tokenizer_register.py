@@ -169,7 +169,7 @@ def terramind_v1_tokenizer_s2l2a(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
@@ -197,7 +197,7 @@ def terramind_v1_tokenizer_s1rtc(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
@@ -225,7 +225,7 @@ def terramind_v1_tokenizer_s1grd(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
@@ -253,7 +253,7 @@ def terramind_v1_tokenizer_dem(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
@@ -308,7 +308,7 @@ def terramind_v1_tokenizer_ndvi(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
@@ -339,7 +339,7 @@ def terramind_v01_tokenizer_s2l2a(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
@@ -370,7 +370,7 @@ def terramind_v01_tokenizer_s1grd(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
@@ -401,7 +401,7 @@ def terramind_v01_tokenizer_dem(**kwargs):
         quant_type="fsq",
         codebook_size="8-8-8-6-5",
         latent_dim=5,
-        clip_sample=True,
+        clip_sample=kwargs.pop("clip_sample", True),
         **kwargs,
     )
 
