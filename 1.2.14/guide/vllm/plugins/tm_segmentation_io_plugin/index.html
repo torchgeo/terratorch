@@ -1,0 +1,3517 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://torchgeo.github.io/terratorch/1.2.14/guide/vllm/plugins/tm_segmentation_io_plugin/">
+      
+      
+        <link rel="prev" href="../segmentation_io_plugin/">
+      
+      
+        <link rel="next" href="../../prepare_your_model/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Terramind Segmentation - TerraTorch</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#terramind-segmentation-ioprocessor-plugin" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="TerraTorch" class="md-header__button md-logo" aria-label="TerraTorch" data-md-component="logo">
+      
+  <img src="../../../../figs/logo_header.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TerraTorch
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Terramind Segmentation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="deep-orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="deep-orange"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/torchgeo/terratorch" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="TerraTorch" class="md-nav__button md-logo" aria-label="TerraTorch" data-md-component="logo">
+      
+  <img src="../../../../figs/logo_header.png" alt="logo">
+
+    </a>
+    TerraTorch
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/torchgeo/terratorch" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Welcome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Models
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../encoder_decoder_factory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoder-Decoder Factory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../terramind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TerraMind
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../prithvi_eo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prithvi EO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../temporal_wrapper/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Temporal Wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving models with vLLM
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Serving models with vLLM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_7_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_7_2" id="__nav_2_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vLLM IOProcessor Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    vLLM IOProcessor Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vllm_io_plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_7_2_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_7_2_2" id="__nav_2_7_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Available Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_2_7_2_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_7_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Available Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../segmentation_io_plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segmentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terramind Segmentation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terramind Segmentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#plugin-specification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin specification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plugin specification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PluginConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#request-data-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Data Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terratorch.vllm.plugins.segmentation.types.RequestData" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RequestData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#request-output-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Output Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RequestOutput
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin Defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TiledInferenceParameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prepare_your_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prepare your model for serving with vLLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../serving_a_model_tensor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initializing and serving a model with vLLM in tensor-to-tensor mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../serving_a_model_image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initializing and serving a model with vLLM in image-to-image mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faqs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../tutorials/the_yaml_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../tutorials/burn_scars_finetuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fine-tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../tutorials/basic_inference_burn_scars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../tutorials/burn_scars_inference_simplified/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simplified Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../tutorials/using_datamodule_multitemporalclassificationModule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-temporal data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../tutorials/adding_custom_modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Package Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Models
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/model_factories/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Factories
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/backbones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backbones
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/decoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/necks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Necks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/heads/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datamodules
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datamodules
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/generic_datamodules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generic Datamodules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/datamodules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specific Datamodules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/generic_datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generic Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specific Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Others
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Others
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/meta_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Meta Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/extra_model_structures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra Model Structures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../package/loss/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loss Handler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../about/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribution Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../about/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../about/license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../about/related_packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Related Packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Welcome
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../../../quick_start/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../../intro/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Serving models with vLLM
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../../vllm_io_plugins/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    vLLM IOProcessor Plugins
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../segmentation_io_plugin/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Available Plugins
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/torchgeo/terratorch/edit/docs/docs/guide/vllm/plugins/tm_segmentation_io_plugin.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/torchgeo/terratorch/raw/docs/docs/guide/vllm/plugins/tm_segmentation_io_plugin.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
+    </a>
+  
+
+
+<h1 id="terramind-segmentation-ioprocessor-plugin">Terramind Segmentation IOProcessor Plugin<a class="headerlink" href="#terramind-segmentation-ioprocessor-plugin" title="Permanent link">#</a></h1>
+<p>This plugin targets segmentation tasks for Terramind models, and assumes
+multimodal input data to be provided via URLs or file paths, organized in
+separate directories by modality. The plugin performs a tiled inference
+according to the parameters given in the model configuration. During
+initialization, the plugin accesses the model's data module configuration from
+the vLLM configuration and instantiates a DataModule object dynamically.</p>
+<p>Currently, the plugin is targeting TerraMind models finetuned on the
+<a href="https://github.com/IBM/ImpactMesh">ImpactMesh</a> dataset and expects exactly
+three modalities to be given in input: DEM, S1RTC, S2L2A.</p>
+<p>This plugin is installed as <code>terratorch_tm_segmentation</code>.</p>
+<h2 id="plugin-specification">Plugin specification<a class="headerlink" href="#plugin-specification" title="Permanent link">#</a></h2>
+<h3 id="model-requirements">Model requirements<a class="headerlink" href="#model-requirements" title="Permanent link">#</a></h3>
+<p>This plugin expects the model to take three parameters for inference, one per
+input modality.</p>
+<p>Below an example input model specification accepted by this plugin. The user can
+change the shapes of the tensors according to their model requirements but the
+number and names of the fields must be kept unchanged to work with ImpactMesh
+data modules.</p>
+<div class="language-json highlight"><span class="filename">Model input specification accepted by the Terramind Segmentation IOProcessor plugin</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">"input"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">"S2L2A"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"torch.Tensor"</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">"shape"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="mi">12</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">        </span><span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">        </span><span class="mi">256</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">        </span><span class="mi">256</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">      </span><span class="p">]</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nt">"S1RTC"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"torch.Tensor"</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="nt">"shape"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">        </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">        </span><span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">        </span><span class="mi">256</span><span class="p">,</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">        </span><span class="mi">256</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">      </span><span class="p">]</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">    </span><span class="nt">"DEM"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"torch.Tensor"</span><span class="p">,</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">      </span><span class="nt">"shape"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">        </span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">        </span><span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">        </span><span class="mi">256</span><span class="p">,</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">        </span><span class="mi">256</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">      </span><span class="p">]</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Full details on TerraTorch models input model specification for vLLM are
+available <a href="../../prepare_your_model/#model-input-specification">here</a>.</p>
+<h3 id="plugin-configuration">Plugin configuration<a class="headerlink" href="#plugin-configuration" title="Permanent link">#</a></h3>
+<p>This plugin allows for additional configuration data to be passed via the
+<code>TERRATORCH_SEGMENTATION_IO_PROCESSOR_CONFIG</code> environment variable. If set, the
+variable should contain the plugin configuration in json string format.</p>
+<p>The plugin configuration format is defined in the <code>PluginConfig</code> class.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="terratorch.vllm.plugins.segmentation.types.PluginConfig" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>terratorch.vllm.plugins.segmentation.types.PluginConfig</code>
+
+
+<a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig" class="headerlink" title="Permanent link">#</a></h3>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>terratorch/vllm/plugins/segmentation/types.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-11">11</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-12">12</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-13">13</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-14">14</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-15">15</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-16">16</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-17">17</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-18">18</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-19">19</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-20">20</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-21">21</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-22">22</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-23">23</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-24">24</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-25">25</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-26">26</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-27">27</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-28">28</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-11"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-11" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-11"></a><span class="k">class</span><span class="w"> </span><span class="nc">PluginConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-12"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-12" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-12"></a>    <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-13"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-13" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-13"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-14"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-14" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-14"></a><span class="sd">    Default output folder path to be used when the out_data_format is set to path. </span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-15"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-15" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-15"></a><span class="sd">    If omitted, the plugin will default to the current user home directory.</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-16"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-16" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-16"></a><span class="sd">    """</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-17"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-17" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-17"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-18"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-18" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-18"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"after"</span><span class="p">)</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-19"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-19" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-19"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">validate_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-20"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-20" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-20"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_path</span><span class="p">:</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-21"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-21" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-21"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">output_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">())</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-22"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-22" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-22"></a>        <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_path</span><span class="p">):</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-23"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-23" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-23"></a>            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">W_OK</span><span class="p">):</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-24"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-24" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-24"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The path: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">output_path</span><span class="si">}</span><span class="s2"> is not writable"</span><span class="p">)</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-25"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-25" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-25"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-26"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-26" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-26"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The path: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">output_path</span><span class="si">}</span><span class="s2"> does not exist"</span><span class="p">)</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-27"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-27" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-27"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__span-0-28"><a id="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-28" name="terratorch.vllm.plugins.segmentation.types.PluginConfig--source--__codelineno-0-28"></a>        <span class="k">return</span> <span class="bp">self</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.PluginConfig.output_path" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">output_path</span> <span class="o">=</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.PluginConfig.output_path" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Default output folder path to be used when the out_data_format is set to path. 
+If omitted, the plugin will default to the current user home directory.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h3 id="request-data-format">Request Data Format<a class="headerlink" href="#request-data-format" title="Permanent link">#</a></h3>
+<p>The input format for the plugin is defined in the <code>RequestData</code> class.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="terratorch.vllm.plugins.segmentation.types.RequestData" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>terratorch.vllm.plugins.segmentation.types.RequestData</code>
+
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestData" class="headerlink" title="Permanent link">#</a></h3>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>terratorch/vllm/plugins/segmentation/types.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-42">42</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-44">44</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-45">45</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-46">46</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-47">47</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-48">48</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-49">49</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-50">50</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-51">51</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-52">52</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-53">53</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-54">54</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-55">55</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-56">56</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-57">57</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-58">58</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-59">59</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-60">60</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-61">61</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-62">62</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-63">63</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-64">64</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-65">65</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-67">67</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-68">68</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-42"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-42" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-42"></a><span class="k">class</span><span class="w"> </span><span class="nc">RequestData</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-43"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-43" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-43"></a>    <span class="n">data_format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"path"</span><span class="p">,</span> <span class="s2">"url"</span><span class="p">]</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-44"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-44" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-44"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-45"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-45" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-45"></a><span class="sd">    Data type for the input image.</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-46"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-46" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-46"></a><span class="sd">    Allowed values are: [`path`, `url`]</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-47"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-47" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-47"></a><span class="sd">    """</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-48"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-48" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-48"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-49"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-49" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-49"></a>    <span class="n">out_data_format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"b64_json"</span><span class="p">,</span> <span class="s2">"path"</span><span class="p">]</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-50"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-50" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-50"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-51"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-51" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-51"></a><span class="sd">    Data type for the output image.</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-52"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-52" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-52"></a><span class="sd">    Allowed values are: [`b64_json`, `path`]</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-53"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-53" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-53"></a><span class="sd">    """</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-54"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-54" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-54"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-55"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-55" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-55"></a>    <span class="n">data</span><span class="p">:</span> <span class="n">Any</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-56"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-56" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-56"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-57"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-57" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-57"></a><span class="sd">    Input image data</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-58"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-58" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-58"></a><span class="sd">    """</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-59"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-59" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-59"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-60"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-60" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-60"></a>    <span class="n">indices</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-61"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-61" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-61"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-62"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-62" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-62"></a><span class="sd">    Indices for bands to be processed in the input file</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-63"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-63" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-63"></a><span class="sd">    """</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-64"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-64" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-64"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-65"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-65" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-65"></a>    <span class="n">out_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-66"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-66" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-66"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-67"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-67" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-67"></a><span class="sd">    Path to store the output image. Only used when out_data_format is set to 'path'</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__span-0-68"><a id="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-68" name="terratorch.vllm.plugins.segmentation.types.RequestData--source--__codelineno-0-68"></a><span class="sd">    """</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestData.data" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">data</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestData.data" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Input image data</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestData.data_format" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">data_format</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestData.data_format" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Data type for the input image.
+Allowed values are: [<code>path</code>, <code>url</code>]</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestData.indices" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">indices</span> <span class="o">=</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestData.indices" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Indices for bands to be processed in the input file</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestData.out_data_format" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">out_data_format</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestData.out_data_format" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Data type for the output image.
+Allowed values are: [<code>b64_json</code>, <code>path</code>]</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestData.out_path" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">out_path</span> <span class="o">=</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestData.out_path" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Path to store the output image. Only used when out_data_format is set to 'path'</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><p>The <code>indices</code> field is ignored by this plugin.</p>
+<p>The optional <code>out_path</code> field allows you to specify a custom output directory
+for the generated GeoTiff file on a per requests basis, when <code>out_data_format</code>
+is set to <code>"path"</code>. If <code>out_path</code> is not provided, the plugin will use the
+default output path from the plugin configuration (set via the
+<code>TERRATORCH_SEGMENTATION_IO_PROCESSOR_CONFIG</code> environment variable).</p>
+<p><strong>Example request payload with URL input and base64 output:</strong></p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"url"</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"out_data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"b64_json"</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">"DEM"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/dem_file"</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">"S1RTC"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/S1RTC_file"</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">"S2L2A"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/S2L2A_file"</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><strong>Example request payload with path input and path output:</strong></p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"path"</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">"out_data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"path"</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/input/directory"</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><strong>Example request payload with URL input and custom path output:</strong></p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">"data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"url"</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">"out_data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"path"</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">"out_path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/custom/output/directory"</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">"DEM"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/dem_file"</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">"S1RTC"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/S1RTC_file"</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">"S2L2A"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/S2L2A_file"</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">}</span>
+</span></code></pre></div>
+<h4 id="multimodal-data-organization">Multimodal Data Organization<a class="headerlink" href="#multimodal-data-organization" title="Permanent link">#</a></h4>
+<p>The structure of the <code>data</code> field in the RequestData structure depends on the
+<code>data_format</code> field. When using URL-based input (<code>data_format: "url"</code>), the
+plugin expects one URL for each modality file.</p>
+<p>For example, your request includes:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"url"</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">"DEM"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/dem_file"</span><span class="p">,</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">"S1RTC"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/S1RTC_file"</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">"S2L2A"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/path/to/S2L2A_file"</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>When using path-based input (<code>data_format: "path"</code>), provide the root directory
+path that already contains the modality subdirectories organized in the same
+structure.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"data_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"path"</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/input/directory/"</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Your directory structure should look like this:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>/path/to/input/directory/
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>├── DEM/
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>│   └── FILE_NAME_DEM.tiff
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>├── S1RTC/
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>│   └── FILE_NAME_S1RTC.zarr.zip
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>└── S2L2A/
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    └── FILE_NAME_S2L2A.zarr.zip
+</span></code></pre></div>
+<p>Each modality has its own subdirectory containing the respective data files.</p>
+<!-- prettier-ignore-start -->
+<div class="admonition warning">
+<p class="admonition-title">One input bundle per request supported</p>
+<p>The plugin currently supports only one input bundle per request
+(one file per modality). Do not place more than one file in each subfolder.</p>
+</div>
+<!-- prettier-ignore-end -->
+
+<h3 id="request-output-format">Request Output Format<a class="headerlink" href="#request-output-format" title="Permanent link">#</a></h3>
+<p>The output format for the plugin is defined in the <code>RequestOutput</code> class.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="terratorch.vllm.plugins.segmentation.types.RequestOutput" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>terratorch.vllm.plugins.segmentation.types.RequestOutput</code>
+
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput" class="headerlink" title="Permanent link">#</a></h3>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>terratorch/vllm/plugins/segmentation/types.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-135">135</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-136">136</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-137">137</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-138">138</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-139">139</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-140">140</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-141">141</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-142">142</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-143">143</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-144">144</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-145">145</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-146">146</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-147">147</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-148">148</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-149">149</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-150">150</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-135"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-135" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-135"></a><span class="k">class</span><span class="w"> </span><span class="nc">RequestOutput</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-136"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-136" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-136"></a>    <span class="n">data_format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"b64_json"</span><span class="p">,</span> <span class="s2">"path"</span><span class="p">]</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-137"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-137" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-137"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-138"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-138" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-138"></a><span class="sd">    Data type for the output image.</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-139"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-139" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-139"></a><span class="sd">    Allowed values are: [`b64_json`, `path`]</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-140"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-140" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-140"></a><span class="sd">    """</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-141"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-141" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-141"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-142"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-142" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-142"></a>    <span class="n">data</span><span class="p">:</span> <span class="n">Any</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-143"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-143" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-143"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-144"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-144" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-144"></a><span class="sd">    Output image data</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-145"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-145" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-145"></a><span class="sd">    """</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-146"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-146" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-146"></a>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-147"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-147" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-147"></a>    <span class="n">request_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-148"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-148" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-148"></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-149"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-149" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-149"></a><span class="sd">    The vLLM request ID if applicable</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__span-0-150"><a id="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-150" name="terratorch.vllm.plugins.segmentation.types.RequestOutput--source--__codelineno-0-150"></a><span class="sd">    """</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestOutput.data" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">data</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput.data" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Output image data</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestOutput.data_format" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">data_format</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput.data_format" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Data type for the output image.
+Allowed values are: [<code>b64_json</code>, <code>path</code>]</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="terratorch.vllm.plugins.segmentation.types.RequestOutput.request_id" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">request_id</span> <span class="o">=</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#terratorch.vllm.plugins.segmentation.types.RequestOutput.request_id" class="headerlink" title="Permanent link">#</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The vLLM request ID if applicable</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h3 id="plugin-defaults">Plugin Defaults<a class="headerlink" href="#plugin-defaults" title="Permanent link">#</a></h3>
+<h4 id="tiled-inference-parameters">Tiled Inference Parameters<a class="headerlink" href="#tiled-inference-parameters" title="Permanent link">#</a></h4>
+<p>By default the plugin uses the same horizontal and vertical crop value of 512
+when computing image tiles. Users can use different crop values by specifying
+them in their model <code>config.json</code> file. See the example below that overrides the
+default values with vertical and horizontal crop values of 256.</p>
+<div class="language-json highlight"><span class="filename">Custom tiled inference parameters in model configuration</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"pretrained_cfg"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">      </span><span class="nt">"init_args"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">        </span><span class="nt">"tiled_inference_parameters"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">          </span><span class="nt">"h_crop"</span><span class="p">:</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">          </span><span class="nt">"w_crop"</span><span class="p">:</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">          </span><span class="nt">"delta"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">        </span><span class="p">}</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">      </span><span class="p">}</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Please note, the <code>tiled_inference_parameters</code> field is not mandatory in the
+model configuration. Full details on the model configuration file can be found
+<a href="../../prepare_your_model/#vllm-compatible-model-configuration">here</a>.</p>
+<p>Full details on the available tiled inference parameters are available in the
+<code>TiledInferenceParameters</code> class.
+</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters</code>
+
+
+<a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters" class="headerlink" title="Permanent link">#</a></h3>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>terratorch/vllm/plugins/segmentation/types.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-31">31</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-32">32</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-33">33</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-34">34</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-35">35</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-36">36</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-37">37</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-39">39</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-31"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-31" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-31"></a><span class="k">class</span><span class="w"> </span><span class="nc">TiledInferenceParameters</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-32"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-32" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-32"></a>    <span class="n">h_crop</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-33"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-33" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-33"></a>    <span class="n">h_stride</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-34"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-34" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-34"></a>    <span class="n">w_crop</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-35"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-35" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-35"></a>    <span class="n">w_stride</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-36"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-36" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-36"></a>    <span class="n">average_patches</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-37"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-37" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-37"></a>    <span class="n">delta</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-38"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-38" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-38"></a>    <span class="n">blend_overlaps</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__span-0-39"><a id="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-39" name="terratorch.vllm.plugins.segmentation.types.TiledInferenceParameters--source--__codelineno-0-39"></a>    <span class="n">padding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bool</span> <span class="o">=</span> <span class="s2">"reflect"</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h4 id="default-output-directory">Default Output Directory<a class="headerlink" href="#default-output-directory" title="Permanent link">#</a></h4>
+<p>If no <code>out_path</code> is specified in the request payload and no output folder is
+configured in the plugin configuration (via the
+<code>TERRATORCH_SEGMENTATION_IO_PROCESSOR_CONFIG</code> environment variable), the plugin
+will default to writing output files to the user's home directory. This default
+only impacts requests that set <code>out_data_format: "path"</code>.</p>
+<h4 id="data-module-configuration">Data Module Configuration<a class="headerlink" href="#data-module-configuration" title="Permanent link">#</a></h4>
+<p>This plugin dynamically instantiates a data module based on the configuration in
+the model's <code>config.json</code> file. The data module is then used for loading the
+input data. By default, the plugin configures the data module in <code>predict</code> mode
+and sets the <code>predict_data_root</code> of the DataModule to the input data folder.
+More info on the data module configuration can be found
+<a href="../../prepare_your_model/#data-module-configuration">here</a>.</p>
+<!-- prettier-ignore-start -->
+<div class="admonition info">
+<p class="admonition-title">Using a different data module</p>
+<p>This plugin currently supports
+<a href="https://github.com/IBM/ImpactMesh">ImpactMesh</a>, imposing a certain structure
+for the input data. e.g., a <code>DEM</code> input file or subfolder is always expected to
+be present, and is used for retrieving the input file metadata. Users interested
+in using a different data module might do so but they will have to guarantee the
+same behavior as the ImpactMesh ones.</p>
+</div>
+<!-- prettier-ignore-end -->
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 4, 2026 10:57:48 UTC">March 4, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../segmentation_io_plugin/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Segmentation">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Segmentation
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../prepare_your_model/" class="md-footer__link md-footer__link--next" aria-label="Next: Prepare your model for serving with vLLM">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Prepare your model for serving with vLLM
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2025 TerraTorch Developers.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["content.code.copy", "content.code.select", "announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.path", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow", "toc.integrate"], "search": "../../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"canonical_version": "stable", "default": "stable", "provider": "mike", "version_selector": true}}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../../../../js/logo.js"></script>
+      
+    
+  </body>
+</html>

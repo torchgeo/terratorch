@@ -1,0 +1,80 @@
+.md-grid {
+  max-width: 1400px;
+}
+
+/*Define content width*/
+.md-content {
+  max-width: 900px;
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* center the content without sidebar*/
+@media screen and (max-width: 1220px) {
+  .md-content {
+   margin-left: auto;
+   margin-right: auto;
+  }
+}
+
+/*Define TerraTorch color as accent*/
+:root  > * {
+  --md-accent-fg-color:        #EE4B2B;
+  --md-accent-fg-color--light: #EE4B2B;
+  --md-accent-fg-color--dark:  #EE4B2B;
+}
+
+/*Overwrite color of current page in sidebar*/
+.md-nav__link--active,
+.md-nav__link--active:focus,
+.md-nav__link--active:hover {
+  color: #EE4B2B !important;
+}
+
+/* Hide the site_name "TerraTorch" in the header and sidebar */
+@media screen and (min-width: 1220px) {
+  img[src="figs/logo_header.png"] {
+    display: none !important;
+  }
+  .md-nav__title {
+    display: none !important;
+  }
+}
+
+/* Style section headers */
+.md-nav__item--section > .md-nav__link {
+  font-size: 0.8rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+
+/* Change color of tip admonitions to TerraTorch color */
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  border-color: rgb(238, 75, 43);
+}
+.md-typeset .tip > .admonition-title,
+.md-typeset .tip > summary {
+  background-color: rgba(238, 75, 43, 0.1);
+}
+.md-typeset .tip > .admonition-title::before,
+.md-typeset .tip > summary::before {
+  background-color: rgb(238, 75, 43);
+}
+
+/* Change color of tip admonitions to TerraTorch color */
+.md-typeset .admonition.faq,
+.md-typeset details.faq {
+  border-color: rgb(200, 200, 200);
+}
+.md-typeset .faq > .admonition-title,
+.md-typeset .faq > summary {
+  background-color: rgba(200, 200, 200, 0.1);
+}
+.md-typeset .faq > .admonition-title::before,
+.md-typeset .faq > summary::before {
+  background-color: rgb(200, 200, 200);
+  -webkit-mask-image: var(--md-admonition-icon--question);
+          mask-image: var(--md-admonition-icon--question);
+}
