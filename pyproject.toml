@@ -7,7 +7,7 @@ include = ["terratorch*"]
 
 [project]
 name = "terratorch"
-version = "v1.2.13"
+version = "v1.2.14"
 description = "TerraTorch - The geospatial foundation model fine-tuning toolkit"
 license = "Apache-2.0 AND MIT"
 license-files = ["LICENSE", "MIT_FILES.txt"]
