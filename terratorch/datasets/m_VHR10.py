@@ -8,13 +8,17 @@ from matplotlib import patches
 from matplotlib.figure import Figure
 from torch import Tensor
 from torchgeo.datasets import VHR10
+try:
+    from torchgeo.datasets.utils import quantile_normalization
+except ImportError:
+    from torchgeo.datasets.utils import percentile_normalization as quantile_normalization
+
 from torchgeo.datasets.utils import (
     Path,
     check_integrity,
     download_and_extract_archive,
     download_url,
     lazy_import,
-    quantile_normalization,
 )
 
 

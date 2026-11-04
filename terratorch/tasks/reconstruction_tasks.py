@@ -4,7 +4,10 @@ import matplotlib.pyplot as plt
 import torch
 from lightning.pytorch.callbacks import Callback
 from torch import nn
-from torchgeo.tasks import BaseTask
+try:
+    from torchgeo.trainers import BaseTask
+except ImportError:
+    from torchgeo.tasks import BaseTask
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection
 
 from terratorch.datasets.utils import unbind_samples
