@@ -13,7 +13,6 @@ from terratorch.models.generic_model_factory import GenericModelFactory
 from terratorch.models.generic_unet_model_factory import GenericUnetModelFactory
 from terratorch.models.object_detection_model_factory import ObjectDetectionModelFactory
 from terratorch.models.prithvi_model_factory import PrithviModelFactory
-from terratorch.models.satmae_model_factory import SatMAEModelFactory
 from terratorch.models.smp_model_factory import SMPModelFactory
 from terratorch.models.timm_model_factory import TimmModelFactory
 
@@ -34,7 +33,6 @@ __all__ = (
     "ObjectDetectionModelFactory",
     "PrithviModelFactory",
     "SMPModelFactory",
-    "SatMAEModelFactory",
     "TimmModelFactory",
     "WxCModelFactory",
 )
