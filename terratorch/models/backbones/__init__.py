@@ -19,3 +19,8 @@ try:
     import terratorch.models.backbones.heliofm_register
 except ImportError:
     pass
+
+try:
+    import terratorch.models.backbones.olmoearth
+except ImportError:
+    pass
