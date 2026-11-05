@@ -5,7 +5,7 @@
 
 These tests verify that the OlmoEarth backbone can be registered,
 instantiated, and produce the expected output shapes. Tests that require
-the olmoearth-pretrain package are skipped if the package is not installed.
+the olmoearth-pretrain-minimal package are skipped if the package is not installed.
 """
 
 import gc
@@ -13,9 +13,9 @@ import gc
 import pytest
 import torch
 
-# Check if olmoearth-pretrain is available
+# Check if olmoearth-pretrain-minimal is available
 try:
-    import olmoearth_pretrain  # noqa: F401
+    import olmoearth_pretrain_minimal  # noqa: F401
 
     HAS_OLMOEARTH = True
 except ImportError:
@@ -23,7 +23,7 @@ except ImportError:
 
 skip_no_olmoearth = pytest.mark.skipif(
     not HAS_OLMOEARTH,
-    reason="olmoearth-pretrain not installed",
+    reason="olmoearth-pretrain-minimal not installed",
 )
 
 
@@ -149,10 +149,10 @@ class TestOlmoEarthBackbone:
 
 
 class TestOlmoEarthImportGuard:
-    """Test behavior when olmoearth-pretrain is not installed."""
+    """Test behavior when olmoearth-pretrain-minimal is not installed."""
 
     def test_import_does_not_fail_without_package(self):
-        """The __init__.py import should not fail even without olmoearth-pretrain."""
+        """The __init__.py import should not fail even without olmoearth-pretrain-minimal."""
         # This test always passes because __init__.py uses try/except
         # If import failed, the entire test suite would fail to collect
         pass

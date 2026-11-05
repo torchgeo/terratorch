@@ -7,11 +7,13 @@ This module registers OlmoEarth (Allen AI) foundation models as backbones
 in the TerraTorch backbone registry. OlmoEarth is a spatio-temporal, multimodal
 foundation model for Earth observations supporting Sentinel-1, Sentinel-2, and Landsat.
 
-Requires the `olmoearth-pretrain` package:
+Requires the `olmoearth-pretrain-minimal` package (a lightweight loader for
+OlmoEarth models, without the training/evaluation dependencies):
     pip install terratorch[olmoearth]
 
 References:
-    - GitHub: https://github.com/allenai/olmoearth_pretrain
+    - GitHub (loader): https://github.com/allenai/olmoearth_pretrain_minimal
+    - GitHub (full):   https://github.com/allenai/olmoearth_pretrain
     - Paper: https://arxiv.org/abs/2511.13655
 """
 
@@ -114,8 +116,8 @@ class OlmoEarthBackbone(nn.Module):
         """
         super().__init__()
 
-        from olmoearth_pretrain.data.constants import Modality as ModalitySpec
-        from olmoearth_pretrain.model_loader import ModelID, load_model_from_id, load_model_from_path
+        from olmoearth_pretrain_minimal import ModelID, load_model_from_id, load_model_from_path
+        from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.constants import Modality as ModalitySpec
 
         self.patch_size = patch_size
         self.input_res = input_res
@@ -162,7 +164,10 @@ class OlmoEarthBackbone(nn.Module):
             List containing a single feature map of shape (B, embed_dim, H', W')
             where H' = H // patch_size and W' = W // patch_size.
         """
-        from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample, MaskValue
+        from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.datatypes import (
+            MaskedOlmoEarthSample,
+            MaskValue,
+        )
 
         B, C, H, W = x.shape
 

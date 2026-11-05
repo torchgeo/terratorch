@@ -166,7 +166,7 @@ tortilla = [
 ]
 
 olmoearth = [
-  "olmoearth-pretrain>=0.1.0",
+  "olmoearth-pretrain-minimal>=0.1.5",
 ]
 
 [project.urls]
