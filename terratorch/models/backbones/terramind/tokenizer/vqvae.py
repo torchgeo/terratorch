@@ -255,7 +255,7 @@ class VQ(nn.Module, PyTorchModelHubMixin):
         Returns:
             self
         """
-        ckpt = torch.load(path, map_location="cpu")
+        ckpt = torch.load(path, map_location="cpu", weights_only=True)
         sd = ckpt["model"] if "model" in ckpt else ckpt["state_dict"]
 
         # Compatibility with ViT-VQGAN weights

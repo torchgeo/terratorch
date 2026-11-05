@@ -5,6 +5,7 @@ from terratorch.tasks.classification_tasks import ClassificationTask
 from terratorch.tasks.embedding_generation import EmbeddingGenerationTask
 from terratorch.tasks.inference_task import InferenceTask
 from terratorch.tasks.multilabel_classification_tasks import MultiLabelClassificationTask
+from terratorch.tasks.embedding_decoding_task import EmbeddingClassificationTask, EmbeddingDecodingTask
 from terratorch.tasks.object_detection_task import ObjectDetectionTask
 from terratorch.tasks.reconstruction_tasks import ReconstructionTask
 from terratorch.tasks.regression_tasks import PixelwiseRegressionTask, ScalarRegressionTask
@@ -29,6 +30,8 @@ __all__ = (
     "EmbeddingGenerationTask",
     "InferenceTask",
     "MultiLabelClassificationTask",
+    "EmbeddingClassificationTask",
+    "EmbeddingDecodingTask",
     "ObjectDetectionTask",
     "PixelwiseRegressionTask",
     "ReconstructionTask",

@@ -37,7 +37,7 @@ print('path in:', path_in)
 path_out = (arg.file).split('.')[0]+'_Fixed.'+(arg.file).split('.')[1]
 print('path out:', path_out)
 
-state_dict = torch.load(path_in, map_location=torch.device('cpu'))
+state_dict = torch.load(path_in, map_location=torch.device('cpu'), weights_only=True)
 state_dict_renamed = {}
 
 for k, v in state_dict.items():

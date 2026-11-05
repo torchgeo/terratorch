@@ -2,6 +2,8 @@ import gc
 
 import pytest
 
+pytest.importorskip("geobench_v2", reason="geobench_v2 optional dependency is not installed")
+
 from terratorch.datamodules import geobench_v2_data_module as gmod
 
 

@@ -1,4 +1,5 @@
 import base64
+import urllib.request
 from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
@@ -23,6 +24,15 @@ async def read_file_async(path: str) -> BytesIO:
     async with await open_file(path, "rb") as f:
         contents = await f.read()
         return BytesIO(contents)
+
+def download_file_sync(url: str, dest_file: Path | None = None) -> BytesIO | None:
+    with urllib.request.urlopen(url) as response:
+        data = response.read()
+    if dest_file:
+        dest_file.write_bytes(data)
+    else:
+        return BytesIO(data)
+
 
 def get_filename_from_url(url: str) -> str:
     """

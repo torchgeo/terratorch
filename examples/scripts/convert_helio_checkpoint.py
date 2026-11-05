@@ -20,7 +20,7 @@ args = parser.parse_args()
 input_file = args.input_file
 output_file = args.output_file
 
-state_dict = torch.load(input_file)
+state_dict = torch.load(input_file, weights_only=True)
 state_dict_ = OrderedDict({"model."+k: v for k,v in state_dict.items()})
 content = {"state_dict": state_dict_, "pytorch-lightning_version": "2.5.0post0"}
 

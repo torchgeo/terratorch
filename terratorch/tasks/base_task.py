@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 import torch
 from lightning.pytorch.callbacks import Callback
-from torchgeo.datasets.utils import unbind_samples
-from torchgeo.trainers import BaseTask
+from torchgeo.tasks import BaseTask
 
+from terratorch.datasets import unbind_samples
 from terratorch.models.model import Model, ModelOutput
 from terratorch.tasks.optimizer_factory import optimizer_factory
 from terratorch.tasks.tiled_inference import tiled_inference
@@ -214,7 +214,7 @@ class TerraTorchTask(BaseTask):
                 elif hasattr(self.logger, "log_image"):
                     # Log image to WandB
                     self.logger.log_image(key="samples", images=[fig], caption=[f"step{self.global_step}_{caption}"])
-        except ValueError:
+        except (ValueError, TypeError):
             pass
         finally:
             plt.close()

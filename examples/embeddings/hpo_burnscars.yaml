@@ -1,0 +1,29 @@
+# HPO search space for the burn scars downstream segmentation task.
+#
+# iterate will call train_burnscars_trial.py for each trial.
+# The learning rate is sampled by Optuna and passed to the script as the
+# environment variable ITERATE_PARAM_LR.
+#
+# terratorch's CLI is built on jsonargparse, so any config key can be
+# overridden with a dotted flag on the command line:
+#   terratorch fit -c downstream_segmentation_burnscars.yaml \
+#                  --optimizer.init_args.lr <value>
+#
+# Sections recognised by iterate:
+#   metrics: – name(s) to extract from ITERATE_OUT_FILE
+#   static:  – fixed key/value pairs passed to every trial
+#   hpo:     – parameters Optuna will optimise
+
+metrics:
+  - val_loss          # minimise validation Dice loss
+
+static:
+  config: downstream_segmentation_burnscars.yaml   # base terratorch config
+  epochs: 5                                        # short run per trial
+
+hpo:
+  lr:
+    type: float
+    low: 1.0e-5
+    high: 1.0e-2
+    log: true         # log-uniform sampling is standard for learning rates

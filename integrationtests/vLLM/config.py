@@ -27,10 +27,10 @@ models_output = {
         "burnscars": "c17c4f602ea7b616",
     },
     "terramind_base_flood": {
-        "flood": "dc25fd8e31cc0a72",
+        "flood": "dc25f59d25cc0273",
     },
     "terramind_base_fire": {
-        "fire": "c143afbe7e3322c0",
+        "fire": "f6088cf60b1de4ea",
     },
 }
 

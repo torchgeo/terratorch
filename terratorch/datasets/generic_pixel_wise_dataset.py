@@ -9,7 +9,13 @@ import warnings
 from abc import ABC
 from collections.abc import Hashable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    try:
+        from tacoreader.dataset import TacoDataset
+    except ImportError:
+        TacoDataset = Any  # type: ignore[assignment,misc]
 
 import albumentations as A
 import matplotlib as mpl
@@ -65,7 +71,7 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
         expand_temporal_dimension: bool = False,
         temporal_channel_major: bool = False,
         reduce_zero_label: bool = False,
-        tortilla_df: pd.DataFrame | None = None,
+        tortilla_df: "pd.DataFrame | TacoDataset | None" = None,
         tortilla_indices: list[Hashable] | None = None,
         return_georeference: bool = False,
     ) -> None:
@@ -108,11 +114,19 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
             temporal_channel_major: Used for expand_temporal_dimension, set True if bands are grouped by channel (all timesteps of one band are stacked together).
             reduce_zero_label (bool): Subtract 1 from all labels. Useful when labels start from 1 instead of the
                 expected 0. Defaults to False.
-            tortilla_df (tortilla.DataFrame | None): Tortilla DataFrame to use for loading data. Defaults to None. If provided, data_root is ignored.
+            tortilla_df (pd.DataFrame | TacoDataset | None): Tortilla DataFrame (tacoreader v1) or
+                TacoDataset (tacoreader v2) to use for loading data. Defaults to None.
+                If provided, data_root is ignored.
             tortilla_indices (list[Hashable] | None): List of indices to use from tortilla_df. Defaults to None, which uses all indices.
             return_georeference (bool): Whether to return georeference metadata info (CRS, Bounds, ...). Defaults to False.
         """
         super().__init__()
+
+        # Resolve TacoDataset once for all v2 isinstance checks below
+        try:
+            from tacoreader.dataset import TacoDataset as _TacoDataset
+        except ImportError:
+            _TacoDataset = None  # type: ignore[assignment]
 
         self.split_file = split
 
@@ -141,7 +155,12 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
 
         self.tortilla_df = tortilla_df
         if tortilla_indices is None and self.tortilla_df is not None:
-            self.tortilla_indices = self.tortilla_df.index.tolist()
+            # v2 TacoDataset: use row count from materialised data
+            if _TacoDataset is not None and isinstance(self.tortilla_df, _TacoDataset):
+                self.tortilla_indices = list(range(len(self.tortilla_df.data)))
+            else:
+                # v1 TortillaDataFrame (pandas DataFrame subclass)
+                self.tortilla_indices = self.tortilla_df.index.tolist()
         else:
             self.tortilla_indices = tortilla_indices
 
@@ -154,7 +173,24 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
         if self.tortilla_df is not None:
             for sample_index in self.tortilla_indices:
                 sample_data = self.tortilla_df.read(sample_index)
-                if isinstance(sample_data, pd.DataFrame):
+                # v2 TacoDataset: .read() on a FOLDER returns a TacoDataFrame;
+                # .read() on a FILE returns the GDAL VSI path as a str.
+                if _TacoDataset is not None and isinstance(self.tortilla_df, _TacoDataset):
+                    if isinstance(sample_data, str):
+                        # Top-level FILE — treat the single VSI path as the image
+                        self.image_files.append(sample_data)
+                    else:
+                        # FOLDER: iterate child rows (TacoDataFrame backed by PyArrow)
+                        arrow_table = sample_data.to_arrow()
+                        for row in arrow_table.to_pylist():
+                            sample_id = row.get("id", "")
+                            vsi_path = row.get("internal:gdal_vsi")
+                            if sample_id == "image":
+                                self.image_files.append(vsi_path)
+                            elif sample_id == "label":
+                                self.segmentation_mask_files.append(vsi_path)
+                elif isinstance(sample_data, pd.DataFrame):
+                    # v1 TortillaDataFrame child
                     for _, row in sample_data.iterrows():
                         if row.get("tortilla:id") == "image":
                             self.image_files.append(row.get("internal:subfile"))
@@ -368,7 +404,7 @@ class GenericNonGeoSegmentationDataset(GenericPixelWiseDataset):
         pca_step: int = 4,
         expand_temporal_dimension: bool = False,
         reduce_zero_label: bool = False,
-        tortilla_df: pd.DataFrame | None = None,
+        tortilla_df: "pd.DataFrame | TacoDataset | None" = None,
         tortilla_indices: list[Hashable] | None = None,
         return_georeference: bool = False,
     ) -> None:

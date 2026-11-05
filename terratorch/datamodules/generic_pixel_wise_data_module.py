@@ -18,11 +18,17 @@ from albumentations.core.composition import BaseCompose, Compose
 
 try:
     import tacoreader
+    import tacoreader.v1 as _tacoreader_v1
+    from tacoreader._legacy import is_legacy_format as _is_legacy_format
+    from tacoreader.dataset import TacoDataset as _TacoDataset
 
     HAS_TACOREADER = True
 except ImportError:
     HAS_TACOREADER = False
     tacoreader = None  # type: ignore
+    _tacoreader_v1 = None  # type: ignore
+    _is_legacy_format = None  # type: ignore
+    _TacoDataset = None  # type: ignore
 from kornia.augmentation import AugmentationSequential
 from torch import Tensor
 from torch.utils.data import DataLoader
@@ -233,12 +239,53 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
                 "tacoreader is required to use tortilla files. Install it with: pip install terratorch[tortilla]"
             )
 
-        self.tortilla_df = tacoreader.load(str(tortilla_file)) if tortilla_file is not None else None  # type: ignore
+        if tortilla_file is not None:
+            path_str = str(tortilla_file)
+            # Legacy v1 formats (.tortilla, .taco) require tacoreader.v1.load
+            if _is_legacy_format is not None and _is_legacy_format(path_str):
+                if _tacoreader_v1 is None:
+                    raise ImportError(
+                        f"Legacy tortilla file format detected ({path_str!r}). "
+                        "tacoreader v2 is installed but tacoreader.v1 is not available. "
+                        "Install tacoreader<1.0 to read legacy files, or migrate to .tacozip format."
+                    )
+                logger.warning(
+                    "Loading legacy v1 tortilla file %r. Consider migrating to .tacozip format using tacotoolbox.",
+                    path_str,
+                )
+                self.tortilla_df = _tacoreader_v1.load(path_str)  # type: ignore[union-attr]
+            else:
+                self.tortilla_df = tacoreader.load(path_str)  # type: ignore
+        else:
+            self.tortilla_df = None
+
+    @staticmethod
+    def _is_v2_taco_dataset(ds: Any) -> bool:
+        """Return True if *ds* is a tacoreader v2 TacoDataset (not a pandas DataFrame)."""
+        return _TacoDataset is not None and isinstance(ds, _TacoDataset)
 
     def _get_tortilla_indices(self, stage: str) -> list[Hashable] | None:
         if self.tortilla_df is None:
             return None
 
+        # tacoreader v2: TacoDataset — materialise the top-level rows and filter
+        # by the 'tortilla:data_split' column when it is present.
+        if self._is_v2_taco_dataset(self.tortilla_df):
+            import pyarrow.compute as pc
+
+            stage_map = {"fit": "train", "validate": "validation", "test": "test"}
+            split_label = stage_map.get(stage)
+            if split_label is None:
+                return None
+
+            arrow_table = self.tortilla_df.data.to_arrow()  # type: ignore[union-attr]
+            if "tortilla:data_split" not in arrow_table.column_names:
+                # Dataset has no data_split column — return all row positions
+                return list(range(arrow_table.num_rows))
+            mask = pc.equal(arrow_table.column("tortilla:data_split"), split_label)
+            return [i for i, keep in enumerate(mask.to_pylist()) if keep]
+
+        # tacoreader v1: TortillaDataFrame (pandas DataFrame subclass)
         if stage in ["fit"]:
             return [i for i, row in self.tortilla_df.iterrows() if row["tortilla:data_split"] == "train"]
         if stage in ["validate"]:

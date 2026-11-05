@@ -19,7 +19,6 @@ from torchgeo.datasets.utils import (
     download_and_extract_archive,
     download_url,
     lazy_import,
-    percentile_normalization,
 )
 
 import terratorch

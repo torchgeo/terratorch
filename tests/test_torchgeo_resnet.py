@@ -734,26 +734,23 @@ class TestPretrainedModels:
     """Test models with pretrained=True flag."""
 
     def test_resnet18_with_pretrained_true_skips_download(self):
-        """Test that pretrained=True calls load_resnet_weights (but skip actual download)."""
+        """Test that pretrained=True calls load_resnet_weights."""
         model_bands = ["RED", "GREEN", "BLUE"]
 
-        # This should try to download weights but we'll catch the error
-        # The goal is to cover the pretrained=True branch in model factories
-        with pytest.raises(Exception):
-            # Will fail when trying to download, but covers the pretrained branch
-            model = ssl4eol_resnet18_landsat_tm_toa_moco(
-                model_bands, pretrained=True
-            )
+        # Thanks to the recent fix in torchgeo backbones, this now correctly 
+        # executes the pretrained branch without raising unintended exceptions.
+        model = ssl4eol_resnet18_landsat_tm_toa_moco(
+            model_bands, pretrained=True
+        )
         gc.collect()
 
     def test_resnet50_with_pretrained_true_skips_download(self):
         """Test that pretrained=True calls load_resnet_weights for ResNet50."""
         model_bands = ["RED", "GREEN", "BLUE"]
 
-        with pytest.raises(Exception):
-            model = ssl4eol_resnet50_landsat_tm_toa_moco(
-                model_bands, pretrained=True
-            )
+        model = ssl4eol_resnet50_landsat_tm_toa_moco(
+            model_bands, pretrained=True
+        )
         gc.collect()
 
     def test_resnet152_with_pretrained_true_skips_download(self):

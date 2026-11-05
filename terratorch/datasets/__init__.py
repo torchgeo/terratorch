@@ -57,9 +57,10 @@ from terratorch.datasets.tiled_dataset_wrapper import TiledDataset
 # Generic Classification Dataset
 from terratorch.datasets.sen4map import Sen4MapDatasetMonthlyComposites
 from terratorch.datasets.substation import Substation
-from terratorch.datasets.utils import HLSBands, OpticalBands, SARBands
+from terratorch.datasets.utils import HLSBands, OpticalBands, SARBands, unbind_samples
 
 # TorchGeo RasterDatasets
+from terratorch.datasets.embedding_dataset import EmbeddingDataset
 from terratorch.datasets.wsf import WSF2019, WSFEvolution
 
 # Surya datasets
@@ -117,4 +118,6 @@ __all__ = (
     "mVHR10",
     "Substation",
     "HelioNetCDFDataset",
+    "EmbeddingDataset",
+    "unbind_samples",
 )

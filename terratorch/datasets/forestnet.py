@@ -155,7 +155,7 @@ class ForestNetNonGeo(NonGeoDataset):
             dates = self._get_dates(selected_visible_images)
 
         vis_images = [np.array(Image.open(img)) for img in selected_visible_images]  # (T, H, W, C)
-        inf_images = [np.load(img, allow_pickle=True) for img in selected_infra_images]  # (T, H, W, C)
+        inf_images = [np.load(img, allow_pickle=False) for img in selected_infra_images]  # (T, H, W, C)
         return vis_images, inf_images, dates
 
     def least_cloudy_image(self, image_files):

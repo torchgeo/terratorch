@@ -36,7 +36,6 @@ def test_create_segmentation_task(backbone, decoder, loss, model_factory: ClayMo
 
     if decoder == "UperNetDecoder":
         model_args["out_indices"] = [1, 2, 3, 4]
-        model_args["scale_modules"] = True
     SemanticSegmentationTask(
         model_args,
         model_factory,
@@ -59,7 +58,6 @@ def test_create_regression_task(backbone, decoder, loss, model_factory: ClayMode
 
     if decoder == "UperNetDecoder":
         model_args["out_indices"] = [1, 2, 3, 4]
-        model_args["scale_modules"] = True
 
     PixelwiseRegressionTask(
         model_args,
@@ -84,7 +82,6 @@ def test_create_classification_task(backbone, decoder, loss, model_factory: Clay
 
     if decoder == "UperNetDecoder":
         model_args["out_indices"] = [1, 2, 3, 4]
-        model_args["scale_modules"] = True
 
     ClassificationTask(
         model_args,

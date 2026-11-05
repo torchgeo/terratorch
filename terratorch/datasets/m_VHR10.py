@@ -14,7 +14,7 @@ from torchgeo.datasets.utils import (
     download_and_extract_archive,
     download_url,
     lazy_import,
-    percentile_normalization,
+    quantile_normalization,
 )
 
 
@@ -126,7 +126,7 @@ class mVHR10(VHR10):
         .. versionadded:: 0.4
         """
         assert show_feats in {"boxes", "masks", "both"}
-        image = percentile_normalization(sample["image"].permute(1, 2, 0).numpy())
+        image = quantile_normalization(sample["image"].permute(1, 2, 0)).numpy()
 
         if self.split == "negative":
             fig, axs = plt.subplots(squeeze=False)

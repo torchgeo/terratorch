@@ -48,7 +48,7 @@ class ClayMAEModule(L.LightningModule):
             }
             self.model = model_map[model_size](**model_args)
             # checkpoint_path = 'mae_v1.5.0_epoch-76_val-loss-0.1612.ckpt'
-            # checkpoint = torch.load(checkpoint_path, map_location="cpu")
+            # checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
             # # Extract the state dictionary
             # state_dict = checkpoint['state_dict']
 

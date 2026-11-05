@@ -24,11 +24,16 @@ from terratorch.registry import BACKBONE_REGISTRY
 from terratorch.tasks import InferenceTask
 
 # Allow overriding default test asset locations via environment variables.
+# DATA_ROOT is the shared storage prefix that all the default paths below live
+# under. Overriding it (e.g. when the /dccstor mount is unavailable) relocates the
+# input datasets referenced by the fit configs; it defaults to "/dccstor" so the
+# behaviour is unchanged when unset.
+DATA_ROOT = os.getenv("TERRATORCH_DATA_ROOT", "/dccstor")
 TEST_MODELS_ROOT = os.getenv(
     "TERRATORCH_TEST_MODELS_ROOT",
-    "/dccstor/terratorch/shared/integrationtests/testing_models",
+    f"{DATA_ROOT}/terratorch/shared/integrationtests/testing_models",
 )
-TMP_ROOT = os.getenv("TERRATORCH_TMP_ROOT", "/dccstor/terratorch/tmp")
+TMP_ROOT = os.getenv("TERRATORCH_TMP_ROOT", f"{DATA_ROOT}/terratorch/tmp")
 TEST_CHECKPOINTS_ROOT = os.getenv("TERRATORCH_TEST_CHECKPOINTS_ROOT", TEST_MODELS_ROOT)
 
 
@@ -89,9 +94,13 @@ def test_models_fit(model_name):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    # Replace /dccstor/terratorch/tmp with TMP_ROOT in the config
+    # Relocate hard-coded storage paths in the config to the configured roots.
+    # Replace the output/checkpoint dir first (most specific), then relocate any
+    # remaining /dccstor input-dataset paths onto DATA_ROOT. Both are no-ops with
+    # the default settings, so the shared-cluster behaviour is unchanged.
     config_str = yaml.dump(config)
     config_str = config_str.replace("/dccstor/terratorch/tmp", TMP_ROOT)
+    config_str = config_str.replace("/dccstor", DATA_ROOT)
     config = yaml.safe_load(config_str)
 
     # Write the modified config to a temporary file

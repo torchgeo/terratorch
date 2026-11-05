@@ -74,6 +74,18 @@ look_up_table = {
     "B10": "CIRRUS",
     "B11": "SWIR_1",
     "B12": "SWIR_2",
+
+    "B1": "COASTAL_AEROSOL",
+    "B2": "BLUE",
+    "B3": "GREEN",
+    "B4": "RED",
+    "B5": "RED_EDGE_1",
+    "B6": "RED_EDGE_2",
+    "B7": "RED_EDGE_3",
+    "B8": "NIR_BROAD",
+    "B8a": "NIR_NARROW",
+    "B9": "WATER_VAPOR",
+
     "VV": "VV",
     "VH": "VH",
     "R": "RED",
@@ -1239,7 +1251,7 @@ def load_resnet_weights(
 
         logging.info(msg)
     elif weights is not None:
-        checkpoint_model = weights.get_state_dict(progress=True)
+        checkpoint_model = weights.get_state_dict(progress=True, weights_only=True)
         checkpoint_model = select_patch_embed_weights(
             checkpoint_model, model, pretrained_bands, model_bands, custom_weight_proj
         )

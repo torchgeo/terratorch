@@ -93,12 +93,17 @@ class LossHandler:
         full_loss = all_losses.pop("loss")
         log_function(f"{self.loss_prefix}loss", full_loss, sync_dist=True, batch_size=batch_size)
 
+        # Log the individual component losses (present when using a CombinedLoss) with the same
+        # settings as the total loss above, i.e. letting Lightning pick on_step/on_epoch from the
+        # hook context (on_step during training, on_epoch during validation/test). Forcing both
+        # on_step=True and on_epoch=True here previously caused DDP to deadlock at the end of the
+        # first epoch, because the extra epoch-level synced reduction was only triggered for the
+        # component losses and not for the total loss, desynchronising the collective calls across
+        # ranks. See https://github.com/IBM/terratorch/issues/982.
         for loss_name, loss_value in all_losses.items():
             log_function(
                 f"{self.loss_prefix}{loss_name}",
                 loss_value,
-                on_epoch=True,
-                on_step=True,
                 sync_dist=True,
                 batch_size=batch_size,
             )

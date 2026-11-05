@@ -57,7 +57,7 @@ jobs:
         run: |
           pip install pip==25.1
           pip --version
-          pip install -e .[test]
+          pip install -e .[test,tortilla,logging] -c constraints/test-py313.txt
       - name: List pip dependencies
         run: pip list
       - name: Test with pytest (fast)
@@ -90,10 +90,13 @@ jobs:
         run: |
           pip install pip==25.1
           pip --version
-          pip install -e .[test]
+          pip install -e .[test,tortilla,logging] -c constraints/test-py313.txt
       - name: Test with pytest (slow)
         run: |
-          pytest -s -v -m "slow" tests
+          # pytest exit code 5 == "no tests collected". The only slow-marked tests
+          # (test_detr.py) require the rfdetr extra and run in the rfdetr-tests job,
+          # so nothing is selected here; treat 5 as success instead of failing the job.
+          pytest -s -v -m "slow" tests || [ "$?" -eq 5 ]
 
   olmoearth-tests:
     environment: cicd
@@ -150,7 +153,7 @@ jobs:
         run: |
           pip install pip==25.1
           pip --version
-          pip install -e .[test,rfdetr]
+          pip install -e .[test,rfdetr] -c constraints/test-py313.txt
       - name: Test RF-DETR integration
         run: |
           pytest -s -v tests/test_detr.py -k "rfdetr"

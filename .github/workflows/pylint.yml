@@ -7,6 +7,12 @@ on:
     branches: [ "main" ]
 
 jobs:
+  torch-load-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Check torch.load uses weights_only=True
+      run: python3 scripts/check_torch_load_weights_only.py
   build:
     runs-on: ubuntu-latest
     strategy:

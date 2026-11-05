@@ -37,7 +37,6 @@ The snippet below shows the structure of the `config.json` file for a Prithvi
           "backbone": "prithvi_eo_v2_300_tl",
           "decoder": "UperNetDecoder",
           "decoder_channels": 256,
-          "decoder_scale_modules": true,
           "num_classes": 2,
           "rescale": true,
           "backbone_bands": [
@@ -56,6 +55,9 @@ The snippet below shows the structure of the `config.json` file for a Prithvi
             },
             {
               "name": "ReshapeTokensToImage"
+            },
+            {
+              "name": "LearnedInterpolateToPyramidal"
             }
           ]
         },
@@ -166,7 +168,6 @@ follows the standard format for a TerraTorch model configuration.
       "backbone": "prithvi_eo_v2_300_tl",
       "decoder": "UperNetDecoder",
       "decoder_channels": 256,
-      "decoder_scale_modules": true,
       "num_classes": 2,
       "rescale": true,
       "backbone_bands": [
@@ -185,6 +186,9 @@ follows the standard format for a TerraTorch model configuration.
         },
         {
           "name": "ReshapeTokensToImage"
+        },
+        {
+          "name": "LearnedInterpolateToPyramidal"
         }
       ]
     },

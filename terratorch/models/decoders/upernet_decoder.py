@@ -1,5 +1,3 @@
-import warnings
-
 import torch
 import torch.nn.functional as F  # noqa: N812
 from torch import Tensor, nn
@@ -20,7 +18,6 @@ class UperNetDecoder(nn.Module):
         pool_scales: tuple[int] = (1, 2, 3, 6),
         channels: int = 256,
         align_corners: bool = True,  # noqa: FBT001, FBT002
-        scale_modules: bool = False,
     ):
         """Constructor
 
@@ -30,33 +27,10 @@ class UperNetDecoder(nn.Module):
                 Module applied on the last feature. Default: (1, 2, 3, 6).
             channels (int, optional): Channels used in the decoder. Defaults to 256.
             align_corners (bool, optional): Wheter to align corners in rescaling. Defaults to True.
-            scale_modules (bool, optional): Whether to apply scale modules to the inputs. Needed for plain ViT.
-                Defaults to False.
         """
         super().__init__()
-        if scale_modules:
-            # TODO: remove scale_modules before v1?
-            warnings.warn(
-                "DeprecationWarning: scale_modules is deprecated and will be removed in future versions. "
-                "Use LearnedInterpolateToPyramidal neck instead.",
-                stacklevel=1,
-            )
 
-        self.scale_modules = scale_modules
-        if scale_modules:
-            self.fpn1 = nn.Sequential(
-                nn.ConvTranspose2d(embed_dim[0], embed_dim[0] // 2, 2, 2),
-                nn.BatchNorm2d(embed_dim[0] // 2),
-                nn.GELU(),
-                nn.ConvTranspose2d(embed_dim[0] // 2, embed_dim[0] // 4, 2, 2),
-            )
-            self.fpn2 = nn.Sequential(nn.ConvTranspose2d(embed_dim[1], embed_dim[1] // 2, 2, 2))
-            self.fpn3 = nn.Sequential(nn.Identity())
-            self.fpn4 = nn.Sequential(nn.MaxPool2d(kernel_size=2, stride=2))
-            self.embed_dim = [embed_dim[0] // 4, embed_dim[1] // 2, embed_dim[2], embed_dim[3]]
-        else:
-            self.embed_dim = embed_dim
-
+        self.embed_dim = embed_dim
         self.out_channels = channels
         self.channels = channels
         self.align_corners = align_corners
@@ -112,13 +86,6 @@ class UperNetDecoder(nn.Module):
                 H, W) which is feature map for last layer of decoder head.
         """
 
-        if self.scale_modules:
-            scaled_inputs = []
-            scaled_inputs.append(self.fpn1(inputs[0]))
-            scaled_inputs.append(self.fpn2(inputs[1]))
-            scaled_inputs.append(self.fpn3(inputs[2]))
-            scaled_inputs.append(self.fpn4(inputs[3]))
-            inputs = scaled_inputs
         # build laterals
         laterals = [lateral_conv(inputs[i]) for i, lateral_conv in enumerate(self.lateral_convs)]
         laterals.append(self.psp_forward(inputs))

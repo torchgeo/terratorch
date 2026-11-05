@@ -468,7 +468,8 @@ class TerraTorchRFDETR(nn.Module):
         """Adapt TerraTorch BackboneWrapper to RF-DETR Joiner-like contract.
 
         Upstream RF-DETR `LWDETR` expects a backbone module that accepts a
-        NestedTensor and returns `(features, pos)` where:
+        NestedTensor and returns either `(features, pos)` (older RF-DETR) or
+        `(features, pos, cross_attn_features)` (newer RF-DETR), where:
         - features: list of NestedTensor objects
         - pos: list of positional encodings in [B, C, H, W]
         """
@@ -479,6 +480,10 @@ class TerraTorchRFDETR(nn.Module):
             self.input_proj = input_proj
             self.position_embedding = position_embedding
             self.num_feature_levels = num_feature_levels
+            # RF-DETR changed backbone unpacking from 2 values to 3 values.
+            # Start in legacy mode and flip automatically if runtime indicates
+            # the newer contract is required.
+            self.return_cross_attn_features = False
 
         def _resized_mask(self, base_mask: Tensor | None, src: Tensor) -> Tensor:
             if base_mask is None:
@@ -519,6 +524,8 @@ class TerraTorchRFDETR(nn.Module):
                     out.append(nested)
                     pos.append(self.position_embedding(nested, align_dim_orders=False).to(src.dtype))
 
+            if self.return_cross_attn_features:
+                return out, pos, None
             return out, pos
 
     def __init__(
@@ -699,7 +706,21 @@ class TerraTorchRFDETR(nn.Module):
         bs, _, img_h, img_w = images.shape
 
         # Run upstream LWDETR model (it builds NestedTensor flow internally).
-        outputs = self.lwdetr(images)
+        # RF-DETR versions in our allowed dependency range use different
+        # backbone return contracts (2 vs 3 unpacked values). We retry once and
+        # flip adapter mode when the unpacking error indicates a mismatch.
+        try:
+            outputs = self.lwdetr(images)
+        except ValueError as ex:
+            msg = str(ex)
+            if "expected 3, got 2" in msg and not self.backbone_adapter.return_cross_attn_features:
+                self.backbone_adapter.return_cross_attn_features = True
+                outputs = self.lwdetr(images)
+            elif "expected 2" in msg and self.backbone_adapter.return_cross_attn_features:
+                self.backbone_adapter.return_cross_attn_features = False
+                outputs = self.lwdetr(images)
+            else:
+                raise
 
         if self.training:
             if targets is None:

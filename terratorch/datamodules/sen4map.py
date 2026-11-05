@@ -8,6 +8,16 @@ from torchvision.transforms.v2 import InterpolationMode
 from terratorch.datasets import Sen4MapDatasetMonthlyComposites
 
 
+class _KeysUnpickler(pickle.Unpickler):
+    """Unpickler that refuses to load any function or class, so only plain data can be loaded.
+
+    Follows the approach recommended in the official pickle docs: https://docs.python.org/3/library/pickle.html#restricting-globals
+    """
+
+    def find_class(self, module, name):
+        raise pickle.UnpicklingError(f"Forbidden global '{module}.{name}' in HDF5 keys file.")
+
+
 class Sen4MapLucasDataModule(pl.LightningDataModule):
     """NonGeo LightningDataModule implementation for Sen4map."""
 
@@ -159,8 +169,10 @@ class Sen4MapLucasDataModule(pl.LightningDataModule):
         if path is None:
             return None
         with open(path, "rb") as f:
-            keys = pickle.load(f)
-            return keys[: int(fraction * len(keys))]
+            keys = _KeysUnpickler(f).load()
+        if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
+            raise ValueError(f"HDF5 keys file {path} must contain a list of strings.")
+        return keys[: int(fraction * len(keys))]
 
     def setup(self, stage: str):
         """Set up datasets.

@@ -36,6 +36,27 @@ modification be merged to `main`. In this way, when an user wants to modify
     ```
     pytest -s -v tests/
     ```
+
+## Reproducing the CI test environment
+
+CI resolves test dependencies against a pinned constraints file so that the exact same
+versions install everywhere (issue [#912](https://github.com/torchgeo/terratorch/issues/912)).
+To reproduce that environment locally, install with the same constraints:
+
+```
+pip install -e .[test] -c constraints/test-py313.txt
+```
+
+The constraints only *cap* versions, so extras that are not part of the lock (for
+example `wxc` or `geobenchv2`) still install and simply float their extra dependencies.
+
+The file is generated from `pyproject.toml` for the CI Python version (3.13). Regenerate
+it whenever you change dependencies, and commit the result:
+
+```
+scripts/compile_constraints.sh   # requires `uv` and Python 3.13
+```
+
 ## Testing using `tox`
 
 * If you want to run tests for more than one Python version, you can use `tox`:

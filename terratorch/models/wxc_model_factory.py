@@ -155,7 +155,7 @@ class WxCModelFactory(ModelFactory):
                 dsp = get_downscaling_pincer(config, backbone)
                 if checkpoint_path:
                     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                    dsp.load_state_dict(torch.load(checkpoint_path, weights_only=False, map_location=device))
+                    dsp.load_state_dict(torch.load(checkpoint_path, weights_only=True, map_location=device))
                 return dsp
             return WxCModuleWrapper(backbone)
 
@@ -173,7 +173,7 @@ class WxCModelFactory(ModelFactory):
 
                 if checkpoint_path:
                     weights_path = model_args.path_model_weights
-                    weights = torch.load(weights_path)["model"]
+                    weights = torch.load(weights_path, weights_only=True)["model"]
                     try:
                         module.load_state_dict(weights)
                     except Exception:

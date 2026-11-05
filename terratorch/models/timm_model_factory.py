@@ -9,12 +9,8 @@ import os
 from timm import create_model
 from torch import nn
 from torchgeo.models import get_weight
+from torchgeo.tasks import utils
 from torchvision.models._api import WeightsEnum
-
-try:
-    from torchgeo.trainers import utils as _torchgeo_utils
-except ImportError:
-    _torchgeo_utils = None
 
 from terratorch.models.model import Model, ModelFactory, ModelOutput
 from terratorch.models.utils import extract_prefix_keys
@@ -59,22 +55,13 @@ class TimmModelFactory(ModelFactory):
         if pretrained and pretrained is not True:
             try:
                 weights = WeightsEnum(pretrained)
-                state_dict = weights.get_state_dict(progress=True)
+                state_dict = weights.get_state_dict(progress=True, weights_only=True)
             except ValueError:
                 if os.path.exists(pretrained):
-                    if _torchgeo_utils is None:
-                        msg = (
-                            "Loading weights from checkpoint requires torchgeo<0.6. "
-                            "Please install a compatible version or provide weights as a WeightsEnum."
-                        )
-                        raise ImportError(msg)
-                    _, state_dict = _torchgeo_utils.extract_backbone(pretrained)
+                    _, state_dict = utils.extract_backbone(pretrained)
                 else:
-                    state_dict = get_weight(pretrained).get_state_dict(progress=True)
-            if _torchgeo_utils is not None:
-                model = _torchgeo_utils.load_state_dict(model, state_dict)
-            else:
-                model.load_state_dict(state_dict, strict=False)
+                    state_dict = get_weight(pretrained).get_state_dict(progress=True, weights_only=True)
+            model = utils.load_state_dict(model, state_dict)
 
         return TimmModelWrapper(model)
 

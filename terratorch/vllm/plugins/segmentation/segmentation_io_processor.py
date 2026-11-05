@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import copy
-import datetime
 import logging
 import os
 import tempfile
@@ -30,13 +28,9 @@ from vllm.outputs import PoolingRequestOutput
 from vllm.plugins.io_processors.interface import IOProcessor, IOProcessorInput, IOProcessorOutput
 
 from terratorch.vllm.plugins import generate_datamodule
-from terratorch.vllm.utils import check_vllm_version
-
-if check_vllm_version("0.16.0", ">"):
-    from vllm.renderers import BaseRenderer
+from vllm.renderers import BaseRenderer
 
 from .types import PluginConfig, RequestData, RequestOutput, SegmentationRequestInfo, TiledInferenceParameters
-from .utils import download_file_async, read_file_async
 
 logger = logging.getLogger(__name__)
 
@@ -184,56 +178,6 @@ class SegmentationIOProcessor(IOProcessor):
 
     def read_geotiff(
         self,
-        file_path: str | None = None,
-        path_type: str | None = None,
-        file_data: bytes | None = None,
-    ) -> tuple[torch.Tensor, dict, tuple[float, float] | None]:
-        """Read all bands from *file_path* and return image + meta info.
-
-        Args:
-            file_path: path to image file.
-
-        Returns:
-            np.ndarray with shape (bands, height, width)
-            meta info dict
-        """
-
-        if all([x is None for x in [file_path, path_type, file_data]]):
-            raise Exception("All input fields to read_geotiff are None")
-        write_to_file: bytes | None = None
-        path: str | None = None
-        if file_path is not None and path_type == "url":
-            resp = urllib.request.urlopen(file_path)
-            write_to_file = resp.read()
-        elif file_path is not None and path_type == "path":
-            path = file_path
-        elif file_path is not None and path_type == "b64_json":
-            image_data = base64.b64decode(file_path)
-            write_to_file = image_data
-        else:
-            raise Exception("Wrong combination of parameters to read_geotiff")
-
-        with tempfile.NamedTemporaryFile() as tmpfile:
-            path_to_use = None
-            if write_to_file:
-                tmpfile.write(write_to_file)
-                path_to_use = tmpfile.name
-            elif path:
-                path_to_use = path
-
-            with rasterio.open(path_to_use) as src:
-                img = src.read()
-                meta = src.meta
-                try:
-                    coords = src.lnglat()
-                except Exception:
-                    # Cannot read coords
-                    coords = None
-
-        return img, meta, coords
-
-    async def read_geotiff_async(
-        self,
         file_path: str,
         path_type: str,
     ) -> tuple[np.ndarray, dict, tuple[float, float]]:
@@ -251,9 +195,11 @@ class SegmentationIOProcessor(IOProcessor):
 
         data: BytesIO
         if file_path is not None and path_type == "url":
-            data = await download_file_async(file_path)
+            with urllib.request.urlopen(file_path) as response:
+                data = BytesIO(response.read())
         elif file_path is not None and path_type == "path":
-            data = await read_file_async(file_path)
+            with open(file_path, "rb") as f:
+                data = BytesIO(f.read())
         elif file_path is not None and path_type == "b64_json":
             image_data = base64.b64decode(file_path)
             data = BytesIO(image_data)
@@ -270,7 +216,7 @@ class SegmentationIOProcessor(IOProcessor):
                 coords = None
         return img, meta, coords
 
-    async def load_image(
+    def load_image(
         self,
         data: list[str],
         path_type: str,
@@ -298,7 +244,7 @@ class SegmentationIOProcessor(IOProcessor):
         location_coords = []
 
         for file in data:
-            img, meta, coords = await self.read_geotiff_async(file_path=file, path_type=path_type)
+            img, meta, coords = self.read_geotiff(file_path=file, path_type=path_type)
             # Rescaling (don't normalize on nodata)
             img = np.moveaxis(img, 0, -1)  # channels last for rescaling
             if indices is not None:
@@ -319,7 +265,7 @@ class SegmentationIOProcessor(IOProcessor):
                     if len(julian_day) == 3:
                         julian_day = int(julian_day)
                     else:
-                        julian_day = datetime.datetime.strptime(julian_day, "%m%d").timetuple().tm_yday
+                        julian_day = datetime.strptime(julian_day, "%m%d").timetuple().tm_yday
                     temporal_coords.append([year, julian_day])
             except Exception:
                 logger.exception("Could not extract timestamp for %s", file)
@@ -366,14 +312,6 @@ class SegmentationIOProcessor(IOProcessor):
         request_id: str | None = None,
         **kwargs,
     ) -> PromptType | Sequence[PromptType]:
-        return asyncio.run(self.pre_process_async(prompt, request_id, **kwargs))
-
-    async def pre_process_async(
-        self,
-        prompt: IOProcessorInput,
-        request_id: str | None = None,
-        **kwargs,
-    ) -> PromptType | Sequence[PromptType]:
 
         preprocess_start = datetime.now()
         image_data = dict(prompt)
@@ -388,7 +326,7 @@ class SegmentationIOProcessor(IOProcessor):
 
         indices = DEFAULT_INPUT_INDICES if not image_data["indices"] else image_data["indices"]
 
-        input_data, temporal_coords, location_coords, meta_data = await self.load_image(
+        input_data, temporal_coords, location_coords, meta_data = self.load_image(
             data=[image_data["data"]],
             indices=indices,
             path_type=image_data["data_format"],
@@ -475,18 +413,22 @@ class SegmentationIOProcessor(IOProcessor):
                 "pixel_values": window.to(torch.float16)[0],
             }
             # not all models use location coordinates, so we don't bother sending them to vLLM if not needed
-            if "location_coords" in self.model_config["input"]["data"]:
+            if "location_coords" in self.model_config["input"]["data"] and location_coords is not None:
                 multi_modal_data["location_coords"] = location_coords
 
-            # after v0.14.0 vLLM has changed the input structure for multimodal data
-            if check_vllm_version("0.14.0", ">"):
-                multi_modal_data = {"image": multi_modal_data}
-
-            prompt = {"prompt_token_ids": [1], "multi_modal_data": multi_modal_data}
+            prompt = {"prompt_token_ids": [1], "multi_modal_data": {"image": multi_modal_data}}
 
             prompts.append(prompt)
 
         return prompts
+
+    async def pre_process_async(
+        self,
+        prompt: IOProcessorInput,
+        request_id: str | None = None,
+        **kwargs,
+    ) -> PromptType | Sequence[PromptType]:
+        return self.pre_process(prompt, request_id, **kwargs)
 
     def post_process(
         self,

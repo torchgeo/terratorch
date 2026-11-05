@@ -16,7 +16,7 @@ import torch
 from matplotlib.figure import Figure
 from torch import Tensor
 from torchgeo.datasets import BioMassters
-from torchgeo.datasets.utils import percentile_normalization
+from torchgeo.datasets.utils import quantile_normalization
 
 from terratorch.datasets.generic_multimodal_dataset import MultimodalToTensor
 from terratorch.datasets.transforms import MultimodalTransforms
@@ -425,7 +425,7 @@ class BioMasstersNonGeo(BioMassters):
                     img = img[:, -1, ...]
                 if sens == "S2":
                     img = img[[2, 1, 0], ...].transpose(1, 2, 0)
-                    img = percentile_normalization(img)
+                    img = quantile_normalization(torch.from_numpy(img).float()).numpy()
                 else:
                     co_polarization = img[0]  # transmit == receive
                     cross_polarization = img[1]  # transmit != receive
@@ -452,7 +452,7 @@ class BioMasstersNonGeo(BioMassters):
                 img = img[:, -1, ...]
             if sens == "S2":
                 img = img[[2, 1, 0], ...].transpose(1, 2, 0)
-                img = percentile_normalization(img)
+                img = quantile_normalization(torch.from_numpy(img).float()).numpy()
             else:
                 co_polarization = img[0]  # transmit == receive
                 cross_polarization = img[1]  # transmit != receive
