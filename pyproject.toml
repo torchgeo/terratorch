@@ -165,6 +165,10 @@ tortilla = [
     "tacoreader>=2.4.0",
 ]
 
+olmoearth = [
+  "olmoearth-pretrain-minimal>=0.1.5",
+]
+
 [project.urls]
 Documentation = "https://torchgeo.github.io/terratorch/"
 Issues = "https://github.com/torchgeo/terratorch/issues"
