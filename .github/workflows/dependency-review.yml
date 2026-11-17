@@ -22,3 +22,7 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
+          # GHSA-fc5q-39xc-vjpf: picomatch ReDoS, affects <= 4.0.7 and no patched
+          # version exists yet (4.0.7 is the current latest). Remove this entry
+          # once upstream publishes a fix and the override is bumped.
+          allow-ghsas: GHSA-fc5q-39xc-vjpf

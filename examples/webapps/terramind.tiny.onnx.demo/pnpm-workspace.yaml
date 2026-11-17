@@ -13,7 +13,7 @@ overrides:
   "browserslist": "4.28.7"
   "immutable@4": "4.3.9"
   "picomatch@2": "2.3.2"
-  "picomatch@4": "4.0.4"
+  "picomatch@4": "4.0.7"
   "baseline-browser-mapping": "2.11.0"
   "rollup@2": "2.80.0"
   "serialize-javascript": "7.1.3"
