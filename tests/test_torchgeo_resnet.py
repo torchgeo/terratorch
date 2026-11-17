@@ -823,7 +823,7 @@ class TestWeightsEnumLoading:
             tmp_path = tmp.name
 
         try:
-            def mock_hf_download(repo_id, filename):
+            def mock_hf_download(repo_id, filename, revision=None, **kwargs):
                 return tmp_path
 
             with patch.object(huggingface_hub, 'hf_hub_download', side_effect=mock_hf_download):
