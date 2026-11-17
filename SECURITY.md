@@ -54,6 +54,10 @@ TerraTorch treats checkpoints as **untrusted input**:
 
 ## Dependency and Supply-Chain Policy
 
+- Pretrained weights are downloaded with an explicit `revision` (commit SHA)
+  wherever the upstream repository is public, so a moved tag cannot silently
+  change the weights. Repositories that require authentication are downloaded
+  from their default branch and should be pinned once a token is available.
 - Dependabot monitors `pip` and `github-actions` dependencies weekly.
 - CodeQL runs on every push to `main` and on every pull request.
 - Pull requests that change dependencies are checked by the dependency review

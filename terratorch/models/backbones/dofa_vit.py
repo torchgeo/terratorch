@@ -40,6 +40,21 @@ waves_list = {
 }
 
 
+def _parse_hf_url(url: str) -> tuple[str, str | None, str]:
+    """Split a Hugging Face file URL into (repo_id, revision, filename).
+
+    Supports both ``https://hf.co/<repo>/resolve/<rev>/<file>`` and
+    ``https://hf.co/<repo>/resolve/<file>``. The revision is returned as
+    ``None`` when the URL does not pin one.
+    """
+    repo_id, _, rest = url.replace("https://hf.co/", "").partition("/resolve/")
+    parts = [p for p in rest.split("/") if p]
+    if len(parts) > 1:
+        return repo_id, parts[0], parts[-1]
+    return repo_id, None, parts[-1] if parts else ""
+
+
+
 def resize(
     input: torch.Tensor,
     size: tuple[int, int] | None = None,
@@ -235,9 +250,12 @@ def load_dofa_weights(
     print("Loading weights")
     if ckpt_data is not None:
         if ckpt_data.find("https://hf.co/") > -1:
-            repo_id = ckpt_data.split("/resolve/")[0].replace("https://hf.co/", "")
-            filename = ckpt_data.split("/")[-1]
-            ckpt_data = huggingface_hub.hf_hub_download(repo_id=repo_id, filename=filename)
+            repo_id, revision, filename = _parse_hf_url(ckpt_data)
+            ckpt_data = huggingface_hub.hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                revision=revision,  # nosec B615 - revision comes from the user-supplied URL
+            )
         checkpoint_model = torch.load(ckpt_data, map_location="cpu", weights_only=True)
 
         for k in ["head.weight", "head.bias"]:
