@@ -1,6 +1,6 @@
 [![Website](https://img.shields.io/badge/Website-TerraMind-0F62FE)](https://ibm.github.io/terramind/)
 [![arXiv](https://img.shields.io/badge/arXiv-2504.11171-b31b1b?logo=arxiv)](https://arxiv.org/abs/2504.11171)
-[![Docs](https://img.shields.io/badge/Docs-EE4B2B?logo=materialformkdocs&logoColor=fff)](https://ibm.github.io/terratorch/stable/guide/terramind/)
+[![Docs](https://img.shields.io/badge/Docs-EE4B2B?logo=materialformkdocs&logoColor=fff)](https://torchgeo.github.io/terratorch/stable/guide/terramind/)
 [![HuggingFace](https://img.shields.io/badge/Hugging_Face-IBM--ESA--Geospaital-FFD21E?logo=huggingface)](https://huggingface.co/ibm-esa-geospatial)
 [![Examples](https://img.shields.io/badge/GitHub-Examples-0F62FE?logo=github)](https://github.com/IBM/terramind)
 
