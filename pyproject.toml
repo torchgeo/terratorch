@@ -55,7 +55,7 @@ dependencies = [
   "geopandas",
   "lightly==1.5.22",
   "h5py",
-  "lightning>=2.6.0",
+  "lightning>=2.6.6",
   "segmentation-models-pytorch>=0.5.0",
   "jsonargparse>=4.40.0",
   "torchgeo>=0.10,<0.11",

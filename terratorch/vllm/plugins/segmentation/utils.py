@@ -10,6 +10,17 @@ from anyio import open_file
 from terratorch.cli_tools import is_one_band
 from rasterio import MemoryFile
 
+_ALLOWED_URL_SCHEMES = ("http", "https")
+
+
+def _check_url_scheme(url: str) -> str:
+    """Reject non-HTTP(S) URLs before handing them to urllib."""
+    scheme = urlparse(url).scheme.lower()
+    if scheme not in _ALLOWED_URL_SCHEMES:
+        raise ValueError(f"Unsupported URL scheme {scheme!r}; only http and https are allowed")
+    return url
+
+
 async def download_file_async(url: str, dest_file: Path | None = None) -> BytesIO | None:
     async with (aiohttp).ClientSession() as session:
         async with session.get(url) as response:
@@ -26,7 +37,7 @@ async def read_file_async(path: str) -> BytesIO:
         return BytesIO(contents)
 
 def download_file_sync(url: str, dest_file: Path | None = None) -> BytesIO | None:
-    with urllib.request.urlopen(url) as response:
+    with urllib.request.urlopen(_check_url_scheme(url)) as response:  # nosec B310 - scheme allowlisted above
         data = response.read()
     if dest_file:
         dest_file.write_bytes(data)

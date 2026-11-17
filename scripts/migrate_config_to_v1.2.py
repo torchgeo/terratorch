@@ -68,7 +68,7 @@ def main():
     args = parser.parse_args()
 
     with open(args.yaml_file) as f:
-        data = yaml.load(f)
+        data = yaml.safe_load(f)
 
     migrated = deep_replace(data)
 
