@@ -1,0 +1,57 @@
+name: Integration smoke (CPU)
+
+# The full integration set (integrationtests/test_base_set.py) needs /dccstor
+# storage, 24 GB RAM, GPU and ~16 GB of checkpoints, so it runs on the cluster.
+# This job covers the same code path - config -> terratorch fit - with a
+# synthetic dataset and one epoch, which fits a standard runner.
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "terratorch/**"
+      - "integrationtests/**"
+      - ".github/workflows/integration-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install CPU torch first
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install TerraTorch
+        run: pip install -e .[test]
+
+      # Some extras pull torchaudio from PyPI, which is a CUDA build and fails to
+      # load against CPU torch. Put the CPU build back.
+      - name: Restore CPU torchaudio
+        run: pip install --force-reinstall --no-deps torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Show environment
+        run: |
+          python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+          pip list
+
+      - name: Smoke test
+        run: pytest -s -v integrationtests/test_smoke_fit.py
