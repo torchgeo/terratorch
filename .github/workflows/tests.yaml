@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'feature/**'
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -96,6 +97,36 @@ jobs:
           # (test_detr.py) require the rfdetr extra and run in the rfdetr-tests job,
           # so nothing is selected here; treat 5 as success instead of failing the job.
           pytest -s -v -m "slow" tests || [ "$?" -eq 5 ]
+
+  olmoearth-tests:
+    environment: cicd
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      - name: Install dependencies
+        run: |
+          pip install pip==25.1
+          pip --version
+          pip install -e .[test,olmoearth]
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --force-reinstall --no-deps
+      - name: Test OlmoEarth integration
+        run: |
+          pytest -s -v tests/test_olmoearth.py
 
   rfdetr-tests:
     environment: cicd
