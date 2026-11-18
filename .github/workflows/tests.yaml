@@ -46,9 +46,9 @@ jobs:
       NUMEXPR_NUM_THREADS: "1"
     steps:
       - name: Clone repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -79,9 +79,9 @@ jobs:
       NUMEXPR_NUM_THREADS: "1"
     steps:
       - name: Clone repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -112,9 +112,9 @@ jobs:
       NUMEXPR_NUM_THREADS: "1"
     steps:
       - name: Clone repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
