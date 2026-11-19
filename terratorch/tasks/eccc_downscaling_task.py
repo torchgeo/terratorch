@@ -5,7 +5,10 @@ from granitewxc.models.loss import rmse_loss
 from lightning.pytorch import Callback
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torchgeo.tasks import BaseTask
+try:
+    from torchgeo.trainers import BaseTask
+except ImportError:
+    from torchgeo.tasks import BaseTask
 from torchmetrics.functional import mean_absolute_error, structural_similarity_index_measure
 
 
