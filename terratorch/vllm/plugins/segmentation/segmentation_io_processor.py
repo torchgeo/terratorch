@@ -28,7 +28,7 @@ from vllm.outputs import PoolingRequestOutput
 from vllm.plugins.io_processors.interface import IOProcessor, IOProcessorInput, IOProcessorOutput
 
 from terratorch.vllm.plugins import generate_datamodule
-from terratorch.vllm.plugins.segmentation.utils import _check_url_scheme
+from terratorch.utils import check_url_scheme
 from vllm.renderers import BaseRenderer
 
 from .types import PluginConfig, RequestData, RequestOutput, SegmentationRequestInfo, TiledInferenceParameters
@@ -196,7 +196,7 @@ class SegmentationIOProcessor(IOProcessor):
 
         data: BytesIO
         if file_path is not None and path_type == "url":
-            with urllib.request.urlopen(_check_url_scheme(file_path)) as response:  # nosec B310 - scheme allowlisted
+            with urllib.request.urlopen(check_url_scheme(file_path)) as response:  # nosec B310 - scheme allowlisted
                 data = BytesIO(response.read())
         elif file_path is not None and path_type == "path":
             with open(file_path, "rb") as f:

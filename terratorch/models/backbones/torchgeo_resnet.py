@@ -14,21 +14,7 @@ from torchvision.models._api import Weights, WeightsEnum
 from terratorch.datasets.utils import OpticalBands, SARBands
 from terratorch.models.backbones.select_patch_embed_weights import select_patch_embed_weights
 from terratorch.registry import TERRATORCH_BACKBONE_REGISTRY
-
-
-def _parse_hf_url(url: str) -> tuple[str, str | None, str]:
-    """Split a Hugging Face file URL into (repo_id, revision, filename).
-
-    Supports both ``https://hf.co/<repo>/resolve/<rev>/<file>`` and
-    ``https://hf.co/<repo>/resolve/<file>``. The revision is returned as
-    ``None`` when the URL does not pin one.
-    """
-    repo_id, _, rest = url.replace("https://hf.co/", "").partition("/resolve/")
-    parts = [p for p in rest.split("/") if p]
-    if len(parts) > 1:
-        return repo_id, parts[0], parts[-1]
-    return repo_id, None, parts[-1] if parts else ""
-
+from terratorch.utils import parse_hf_url
 
 
 class ResNetEncoderWrapper(nn.Module):
@@ -1246,7 +1232,7 @@ def load_resnet_weights(
     pretrained_bands = get_pretrained_bands(weights.meta["bands"]) if "bands" in weights.meta else []
     if ckpt_data is not None:
         if ckpt_data.find("https://hf.co/") > -1:
-            repo_id, revision, filename = _parse_hf_url(ckpt_data)
+            repo_id, revision, filename = parse_hf_url(ckpt_data)
             ckpt_data = huggingface_hub.hf_hub_download(
                 repo_id=repo_id,
                 filename=filename,

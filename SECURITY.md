@@ -2,8 +2,9 @@
 
 ## Supported Versions
 
-TerraTorch is developed on `main` and released from there. Security fixes are
-backported to the latest minor release line only.
+TerraTorch is developed on `main` and released from there. Security fixes land
+on `main` first. Whether a fix is backported to an older release line is decided
+case by case, depending on the severity of the issue.
 
 | Version | Supported |
 | ------- | --------- |
@@ -22,12 +23,6 @@ reporting:
 2. Click **Report a vulnerability**.
 3. Describe the issue, the affected version, and a minimal reproduction if
    possible.
-
-You can expect:
-
-- an acknowledgement within **5 business days**,
-- an assessment and a remediation plan within **30 days**,
-- credit in the published advisory unless you prefer to stay anonymous.
 
 If you cannot use GitHub private reporting, contact the maintainers listed in
 [`pyproject.toml`](pyproject.toml) directly.

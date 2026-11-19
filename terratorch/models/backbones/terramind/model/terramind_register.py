@@ -516,6 +516,7 @@ def build_terrammind_vit(
     ckpt_path: str | None = None,
     bands: dict[str, list] | None = None,
     pretrained_bands: dict[str, list] | None = None,
+    hf_hub_revision: str | None = None,
     **kwargs,
 ):
 
@@ -535,7 +536,7 @@ def build_terrammind_vit(
         state_dict_file = hf_hub_download(
             repo_id=pretrained_weights[variant]["hf_hub_id"],
             filename=pretrained_weights[variant]["hf_hub_filename"],
-            revision=pretrained_weights[variant].get("hf_hub_revision"),
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn(state_dict, model)
@@ -547,7 +548,13 @@ def build_terrammind_vit(
     return model
 
 
-def build_terrammind_encdec(variant: str = None, pretrained: bool = False, ckpt_path: str | None = None, **kwargs):
+def build_terrammind_encdec(
+    variant: str = None,
+    pretrained: bool = False,
+    ckpt_path: str | None = None,
+    hf_hub_revision: str | None = None,
+    **kwargs,
+):
 
     model = TerraMind(**kwargs)
 
@@ -565,7 +572,7 @@ def build_terrammind_encdec(variant: str = None, pretrained: bool = False, ckpt_
         state_dict_file = hf_hub_download(
             repo_id=pretrained_weights[variant]["hf_hub_id"],
             filename=pretrained_weights[variant]["hf_hub_filename"],
-            revision=pretrained_weights[variant].get("hf_hub_revision"),
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn(state_dict, model)
@@ -580,6 +587,7 @@ def build_terrammind_tim(
     ckpt_path: str | None = None,
     bands: dict[str, list] | None = None,
     pretrained_bands: dict[str, list] | None = None,
+    hf_hub_revision: str | None = None,
     **kwargs,
 ):
 
@@ -612,7 +620,7 @@ def build_terrammind_tim(
         state_dict_file = hf_hub_download(
             repo_id=pretrained_weights[variant]["hf_hub_id"],
             filename=pretrained_weights[variant]["hf_hub_filename"],
-            revision=pretrained_weights[variant].get("hf_hub_revision"),
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn_tim(state_dict, model)
@@ -623,7 +631,13 @@ def build_terrammind_tim(
     return model
 
 
-def build_terrammind_generate(variant: str = None, pretrained: bool = False, ckpt_path: str | None = None, **kwargs):
+def build_terrammind_generate(
+    variant: str = None,
+    pretrained: bool = False,
+    ckpt_path: str | None = None,
+    hf_hub_revision: str | None = None,
+    **kwargs,
+):
 
     model = TerraMindGeneration(pretrained=pretrained, **kwargs)
 
@@ -641,7 +655,7 @@ def build_terrammind_generate(variant: str = None, pretrained: bool = False, ckp
         state_dict_file = hf_hub_download(
             repo_id=pretrained_weights[variant]["hf_hub_id"],
             filename=pretrained_weights[variant]["hf_hub_filename"],
-            revision=pretrained_weights[variant].get("hf_hub_revision"),
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn_generate(state_dict, model)

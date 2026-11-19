@@ -13,6 +13,7 @@ from torchgeo.models import dofa
 from torchvision.models._api import Weights, WeightsEnum
 
 from terratorch.registry import TERRATORCH_BACKBONE_REGISTRY
+from terratorch.utils import parse_hf_url
 
 waves_list = {
     "COASTAL_AEROSOL": 0.44,
@@ -38,21 +39,6 @@ waves_list = {
     "DSC_VH": 5.405,
     "VV-VH": 5.405,
 }
-
-
-def _parse_hf_url(url: str) -> tuple[str, str | None, str]:
-    """Split a Hugging Face file URL into (repo_id, revision, filename).
-
-    Supports both ``https://hf.co/<repo>/resolve/<rev>/<file>`` and
-    ``https://hf.co/<repo>/resolve/<file>``. The revision is returned as
-    ``None`` when the URL does not pin one.
-    """
-    repo_id, _, rest = url.replace("https://hf.co/", "").partition("/resolve/")
-    parts = [p for p in rest.split("/") if p]
-    if len(parts) > 1:
-        return repo_id, parts[0], parts[-1]
-    return repo_id, None, parts[-1] if parts else ""
-
 
 
 def resize(
@@ -250,7 +236,7 @@ def load_dofa_weights(
     print("Loading weights")
     if ckpt_data is not None:
         if ckpt_data.find("https://hf.co/") > -1:
-            repo_id, revision, filename = _parse_hf_url(ckpt_data)
+            repo_id, revision, filename = parse_hf_url(ckpt_data)
             ckpt_data = huggingface_hub.hf_hub_download(
                 repo_id=repo_id,
                 filename=filename,
