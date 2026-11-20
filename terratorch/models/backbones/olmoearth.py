@@ -39,7 +39,7 @@ OLMOEARTH_CONFIGS: dict[str, dict] = {
     },
     "olmoearth_v1_tiny": {
         "model_id": "OlmoEarth-v1-Tiny",
-        "embed_dim": 128,
+        "embed_dim": 192,
     },
     "olmoearth_v1_base": {
         "model_id": "OlmoEarth-v1-Base",

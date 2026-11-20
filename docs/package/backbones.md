@@ -26,6 +26,10 @@
     options:
         toc_label: "DOFA"
 
+:::terratorch.models.backbones.olmoearth.OlmoEarthBackbone
+    options:
+        toc_label: "OlmoEarth"
+
 :::terratorch.models.backbones.clay_v1.embedder
     options:
         toc_label: "Clay v1"
