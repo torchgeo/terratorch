@@ -385,6 +385,63 @@ class LearnedInterpolateToPyramidal(Neck):
 
 
 @TERRATORCH_NECK_REGISTRY.register
+class TemporalPooling(Neck):
+    """Reduce time-concatenated feature maps (B, T*C, H, W) to (B, C, H, W).
+
+    Multi-temporal backbones often stack time into channels: ``ReshapeTokensToImage`` with
+    ``effective_time_dim=T`` (e.g. Prithvi), or the temporal wrapper with ``pooling: concat``.
+    This neck pools over time afterwards, so every backbone can use the same temporal pooling,
+    and the decoder width no longer grows with T.
+
+    ```yaml
+    necks:
+      - name: ReshapeTokensToImage
+        effective_time_dim: 4
+      - name: TemporalPooling
+        n_timestamps: 4
+        pooling: linear
+    ```
+
+    Args:
+        channel_list: Channels per feature map, each a multiple of ``n_timestamps``.
+        n_timestamps: Number of time steps concatenated into the channel axis.
+        pooling: How the time steps are merged, per feature map:
+            "mean": parameter-free average.
+            "linear": learned weighted sum over time, ``nn.Linear(T, 1)`` shared across channels
+            (T + 1 parameters), like ``multi_temporal_strategy: linear`` in PANGAEA-bench.
+            "conv": learned merge of all time steps and channels, a 1x1 ``nn.Conv2d(T*C, C)``
+            (T*C*C + C parameters), so time steps can be weighted per channel and channels mixed.
+    """
+
+    def __init__(self, channel_list: list[int], n_timestamps: int, pooling: str = "mean") -> None:
+        super().__init__(channel_list)
+        if pooling not in ("mean", "linear", "conv"):
+            msg = f"pooling must be 'mean', 'linear' or 'conv', got {pooling!r}"
+            raise ValueError(msg)
+        if any(c % n_timestamps for c in channel_list):
+            msg = f"channel_list={channel_list} is not divisible by n_timestamps={n_timestamps}"
+            raise ValueError(msg)
+        self.n_timestamps = n_timestamps
+        self.pooling = pooling
+        if pooling == "linear":
+            self.tmap = nn.ModuleList([nn.Linear(n_timestamps, 1) for _ in channel_list])
+        elif pooling == "conv":
+            self.tmap = nn.ModuleList([nn.Conv2d(c, c // n_timestamps, 1) for c in channel_list])
+
+    def forward(self, features: list[torch.Tensor], **kwargs) -> list[torch.Tensor]:
+        out = []
+        if self.pooling == "conv":
+            return [conv(x) for conv, x in zip(self.tmap, features, strict=True)]
+        for i, x in enumerate(features):
+            x = rearrange(x, "b (t c) h w -> b c h w t", t=self.n_timestamps)
+            out.append(x.mean(dim=-1) if self.pooling == "mean" else self.tmap[i](x).squeeze(-1))
+        return out
+
+    def process_channel_list(self, channel_list: list[int]) -> list[int]:
+        return [c // self.n_timestamps for c in channel_list]
+
+
+@TERRATORCH_NECK_REGISTRY.register
 class FeaturePyramidNetworkNeck(Neck):
     """Uses feature pyramid network from torchvision"""
 
