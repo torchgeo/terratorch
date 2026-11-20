@@ -30,6 +30,10 @@
     options:
         toc_label: "Clay v1"
 
+:::terratorch.models.backbones.galileo.galileo.GalileoBackbone
+    options:
+        toc_label: "Galileo"
+
 ## APIs for External Models
 
 !!! tip
