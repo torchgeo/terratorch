@@ -56,3 +56,19 @@ the lighter `olmoearth-pretrain-minimal`; both work.
 - `temporal_pooling`: `mean` (default) or `concat` (time stacked into channels, needs `n_timestamps`).
 - `fast_pass` (default `True`) skips the attention mask, which otherwise runs out of memory at small patch sizes.
 - Do not use `backbone_use_temporal`: OlmoEarth encodes the time series itself.
+
+## Tips
+
+- **Normalization**: OlmoEarth was pre-trained on raw values (Sentinel-2 L2A digital numbers, Sentinel-1 in dB),
+  mapped from `mean ± 2·std` to `[0, 1]` with the statistics in `olmoearth_pretrain*/data/norm_configs/computed.json`.
+  To reproduce this with the TerraTorch datamodules, set `means` to `mean - 2·std` and `stds` to `4·std`.
+- **Memory**: the encoder attends over `(H / patch_size)² · T · band sets` tokens (Sentinel-2 has 3 band sets,
+  Sentinel-1 one). Halving the patch size quadruples the tokens; keep `fast_pass: True` for small patch sizes.
+- **Time series**: with `temporal_pooling: concat`, a learned temporal pooling neck (`TemporalPooling`) can weight the
+  time steps instead of averaging them.
+- **Elevation**: `srtm` is accepted by `olmoearth-pretrain` and `olmoearth-pretrain-minimal` < 0.1, but it was only a
+  decoding target during pre-training, so its encoder embedding is untrained.
+- **Frozen encoder**: works with `freeze_backbone: True`.
+
+See the [OlmoEarth repository](https://github.com/allenai/olmoearth_pretrain) for the pre-training data and
+evaluation details.
