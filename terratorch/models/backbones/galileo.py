@@ -200,7 +200,7 @@ class GalileoBackbone(nn.Module):
         channels = self.embed_dim * (self.n_timestamps if self.temporal_pooling == "concat" else 1)
         return [channels] * (len(self.out_indices) if self.out_indices else 1)
 
-    def forward(self, x: Tensor | dict[str, Tensor], months: Tensor | None = None, **kwargs) -> list[Tensor]:
+    def forward(self, x: Tensor | dict[str, Tensor], months: Tensor | None = None, **kwargs: object) -> list[Tensor]:
         """
         Args:
             x: Tensor (B, C, H, W) or (B, C, T, H, W), or a dict of Galileo families (see class docs).
