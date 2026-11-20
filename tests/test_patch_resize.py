@@ -60,3 +60,20 @@ def test_encoder_decoder_factory():
         out = model({"S2L2A": torch.randn(1, 12, 64, 64)}).output
     assert out.shape == (1, 2, 64, 64)
     gc.collect()
+
+
+def test_native_patch_size_resolution(monkeypatch):
+    seen = {}
+
+    class Dummy(torch.nn.Module):
+        out_channels = [1]
+
+    def build(name, **kwargs):
+        seen.update(kwargs)
+        return Dummy()
+
+    monkeypatch.setattr("terratorch.models.utils.BACKBONE_REGISTRY.build", build)
+    assert _get_backbone("x", patch_resize=8).scale == 2  # default native 16
+    assert _get_backbone("x", patch_resize=4, patch_size=8).scale == 2 and seen.pop("patch_size") == 8
+    model = _get_backbone("x", patch_resize=4, patch_resize_native=32)
+    assert model.scale == 8 and "patch_size" not in seen and "patch_resize_native" not in seen

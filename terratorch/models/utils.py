@@ -154,7 +154,8 @@ def _get_backbone(backbone: str | nn.Module, **backbone_kwargs) -> nn.Module:
     features_permute_op = backbone_kwargs.pop("temporal_features_permute_op", None)
     subset_lengths = backbone_kwargs.pop("temporal_subset_lengths", None)
     patch_resize = backbone_kwargs.pop("patch_resize", None)
-    patch_resize_native = backbone_kwargs.pop("patch_resize_native", 16)
+    # native patch size: patch_resize_native (not passed to the model), else patch_size (passed on), else 16
+    patch_resize_native = backbone_kwargs.pop("patch_resize_native", None) or backbone_kwargs.get("patch_size") or 16
     patch_resize_interpolation = backbone_kwargs.pop("patch_resize_interpolation", "bilinear")
 
     if isinstance(backbone, nn.Module):
@@ -192,8 +193,9 @@ class PatchResize(nn.Module):
     256 px input to 512 px, giving a 32 x 32 token grid.
 
     Only the backbone input is resized; labels keep their resolution and the decoder upsamples to it
-    as usual. Set it from a model config with ``backbone_patch_resize: 8`` (and optionally
-    ``backbone_patch_resize_native``, ``backbone_patch_resize_interpolation``).
+    as usual. Set it from a model config with ``backbone_patch_resize: 8``. The native patch size is
+    ``backbone_patch_resize_native`` if given (not passed to the backbone), else ``backbone_patch_size``
+    (also passed to the backbone, as usual), else 16.
 
     Args:
         encoder: The wrapped backbone. Its ``out_channels`` are passed through.

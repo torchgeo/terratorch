@@ -77,8 +77,11 @@ Labels keep their resolution. With `backbone_use_temporal`, each time step is re
 ```yaml
 backbone: terramind_v1_base
 backbone_patch_resize: 8            # 256 px input -> 512 px -> 32 x 32 tokens
-backbone_patch_resize_native: 16    # the encoder's patch size (default 16)
 ```
+
+The native patch size is taken from `backbone_patch_resize_native`, else from `backbone_patch_size`
+(which is also passed to the encoder, as usual), else 16. Use `backbone_patch_resize_native` for encoders
+that do not accept a `patch_size` argument.
 
 ## Necks
 
