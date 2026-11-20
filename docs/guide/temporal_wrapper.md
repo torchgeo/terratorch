@@ -29,7 +29,7 @@ Select the temporal aggregation with the `pooling` parameter:
 - `"linear"`: Learned weighted sum over time, `nn.Linear(T, 1)` shared across channels (T + 1 parameters per layer). Additional `n_timestamps` required.
 - `"conv"`: Learned merge of all timesteps and channels, a 1x1 `Conv2d(T*C, C)` (T·C² + C parameters per layer). Additional `n_timestamps` required.
 
-The pooling is implemented by the [`TemporalPooling`](#temporalpooling-neck) neck, which the wrapper calls on the stacked per-timestep features. The learned poolings (`linear`, `conv`) stay trainable with `freeze_backbone`: the wrapper freezes only the wrapped backbone (using the backbone's own `freeze()` if it has one, e.g. to keep VPT prompts trainable).
+`linear` and `conv` stay trainable with `freeze_backbone`.
 
 !!! warning
     TerraTorch necks and decoders expect 4D inputs. Use a temporal aggregation that returns 4D (`mean`, `max`, `diff` or `concat`) for TerraTorch fine-tunings.
@@ -134,16 +134,9 @@ Use the wrapped model wherever a backbone is expected (e.g., in TerraTorch tasks
 
 ## TemporalPooling neck
 
-`TemporalPooling` pools features whose timesteps are concatenated along one dimension. Use it when the time steps are
-concatenated *before* the neck, so the TemporalWrapper cannot pool them:
-
-- models that encode the time series themselves and concatenate time into channels, e.g. Prithvi
-  (`ReshapeTokensToImage` with `effective_time_dim`), or OlmoEarth and Galileo with `temporal_pooling: concat`;
-- a TemporalWrapper with `pooling: concat`, to apply the pooling as part of the decoder instead of the backbone.
-
-Each feature `[B, T*C, H, W]` is split into `[B, T, C, H, W]` and pooled over T. All pooling modes above are
-available (`mean`, `max`, `diff`, `linear`, `conv`, plus `subset_lengths`); `concat` and `keep` return the features
-unchanged. Necks are not frozen with `freeze_backbone`.
+Pools features with the timesteps concatenated in channels, `[B, T*C, H, W]` -> `[B, C, H, W]`, e.g. from Prithvi
+(`ReshapeTokensToImage` with `effective_time_dim`) or a TemporalWrapper with `pooling: concat`. It supports the same
+pooling modes and `subset_lengths`; `dim` (default 1) sets the concatenated dimension.
 
 === "YAML"
     ```yaml
@@ -180,11 +173,3 @@ unchanged. Necks are not frozen with `freeze_backbone`.
         ...
     }
     ```
-
-`dim` (default 1) is the dimension along which the timesteps are concatenated, e.g. `dim: 2` for token sequences
-`[B, N, T*D]`. Nothing is specific to time: modalities concatenated along channels, e.g. TerraMind with
-`backbone_merge_method: concat`, are pooled the same way, with `n_timestamps` set to the number of modalities.
-
----
-
-Example notebook:: [TemporalWrapper.ipynb](https://github.com/IBM/terratorch/blob/main/examples/notebooks/TemporalWrapper.ipynb)
