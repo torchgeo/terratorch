@@ -77,3 +77,19 @@ def test_native_patch_size_resolution(monkeypatch):
     assert _get_backbone("x", patch_resize=4, patch_size=8).scale == 2 and seen.pop("patch_size") == 8
     model = _get_backbone("x", patch_resize=4, patch_resize_native=32)
     assert model.scale == 8 and "patch_size" not in seen and "patch_resize_native" not in seen
+
+
+def test_freeze_uses_wrapped_freeze():
+    class Encoder(torch.nn.Module):
+        out_channels = [1]
+
+        def __init__(self):
+            super().__init__()
+            self.frozen, self.prompt = torch.nn.Linear(1, 1), torch.nn.Linear(1, 1)
+
+        def freeze(self):
+            self.frozen.requires_grad_(False)
+
+    model = PatchResize(Encoder(), patch_size=8)
+    model.freeze()
+    assert not model.encoder.frozen.weight.requires_grad and model.encoder.prompt.weight.requires_grad

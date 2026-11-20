@@ -221,6 +221,13 @@ class PatchResize(nn.Module):
         flat = nn.functional.interpolate(x.reshape(-1, 1, h, w), size=size, mode=self.interpolation)
         return flat.reshape(*x.shape[:-2], *size)
 
+    def freeze(self) -> None:
+        """Freeze the wrapped encoder, using its own ``freeze`` if it has one (e.g. Prithvi with VPT)."""
+        if hasattr(self.encoder, "freeze"):
+            self.encoder.freeze()
+        else:
+            self.encoder.requires_grad_(False)
+
     def forward(self, x: torch.Tensor | dict[str, torch.Tensor], *args, **kwargs):
         if self.scale != 1:
             x = {k: self._resize(v) for k, v in x.items()} if isinstance(x, dict) else self._resize(x)
