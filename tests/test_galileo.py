@@ -5,8 +5,8 @@ import gc
 import pytest
 import torch
 
-from terratorch.models.backbones.galileo.galileo import GalileoBackbone, _create_galileo_backbone
-from terratorch.models.backbones.galileo.single_file_galileo import SPACE_BANDS, SPACE_TIME_BANDS
+from terratorch.models.backbones.galileo import GalileoBackbone, _create_galileo_backbone
+from terratorch.models.backbones.galileo import SPACE_BANDS, SPACE_TIME_BANDS
 from terratorch.registry import BACKBONE_REGISTRY
 
 S2_S1_DEM = ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B9", "B11", "B12", "VV", "VH", "elevation"]
