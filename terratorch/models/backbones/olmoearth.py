@@ -19,6 +19,7 @@ References:
 """
 
 import logging
+import warnings
 from collections.abc import Callable
 from types import SimpleNamespace
 
@@ -88,8 +89,10 @@ def _olmoearth_api() -> SimpleNamespace:
     try:
         from olmoearth_pretrain_minimal import ModelID, load_model_from_id, load_model_from_path
         from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.constants import Modality
+        from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.data.normalize import load_computed_config
         from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.datatypes import MaskedOlmoEarthSample, MaskValue
     except ImportError:
+        from olmoearth_pretrain.data.normalize import load_computed_config
         from olmoearth_pretrain.data.constants import Modality
         from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample, MaskValue
         from olmoearth_pretrain.model_loader import ModelID, load_model_from_id, load_model_from_path
@@ -100,7 +103,34 @@ def _olmoearth_api() -> SimpleNamespace:
         Modality=Modality,
         MaskedOlmoEarthSample=MaskedOlmoEarthSample,
         MaskValue=MaskValue,
+        load_computed_config=load_computed_config,
     )
+
+
+def olmoearth_normalization(
+    bands: dict[str, list[str]], std_multiplier: float = 2.0
+) -> tuple[list[float], list[float]]:
+    """Means and stds for TerraTorch datamodules that reproduce OlmoEarth's pre-training normalization.
+
+    OlmoEarth maps raw values (Sentinel-2 L2A digital numbers, Sentinel-1 in dB) from ``mean ± 2·std`` to [0, 1],
+    with the statistics shipped in the OlmoEarth package. ``(x - (mean - 2·std)) / (4·std)`` is the same, so pass
+    the returned values as the datamodule's ``means`` and ``stds``.
+
+    Args:
+        bands: The backbone's ``bands``, ``{modality: [band, ...]}`` in input channel order.
+        std_multiplier: Width of the normalized range in standard deviations, 2 in pre-training.
+
+    Returns:
+        ``(means, stds)``, one value per input channel.
+    """
+    stats = _olmoearth_api().load_computed_config()
+    means, stds = [], []
+    for name, names in bands.items():
+        for band in names:
+            band_stats = {k.lower(): v for k, v in stats[name].items()}[band.lower()]
+            means.append(band_stats["mean"] - std_multiplier * band_stats["std"])
+            stds.append(2 * std_multiplier * band_stats["std"])
+    return means, stds
 
 
 class OlmoEarthBackbone(nn.Module):
@@ -120,8 +150,9 @@ class OlmoEarthBackbone(nn.Module):
       stack. It is split into OlmoEarth's native modalities and each is reordered;
     - a dict ``{modality: tensor}``, optionally with a ``"timestamps"`` entry.
 
-    All modalities are encoded jointly. The output averages the band sets of each modality,
-    then the modalities. Non-multitemporal modalities (e.g. ``srtm``) are averaged over time.
+    All modalities are encoded jointly. The output averages the band sets of each modality, then
+    the modalities (or concatenates them, ``modality_pooling="concat"``). Non-multitemporal
+    modalities (e.g. ``srtm``) are averaged over time.
     """
 
     def __init__(
@@ -138,6 +169,7 @@ class OlmoEarthBackbone(nn.Module):
         n_timestamps: int = 1,
         out_indices: list[int] | None = None,
         fast_pass: bool = True,
+        modality_pooling: str = "mean",
     ):
         """Initialize OlmoEarth backbone.
 
@@ -152,7 +184,8 @@ class OlmoEarthBackbone(nn.Module):
             ckpt_path: Optional path to a local checkpoint file
             bands: Channel layout of a stacked input tensor, modality by modality in channel
                 order, e.g. ``{"sentinel2_l2a": ["B01", ..., "B12"], "sentinel1": ["vv", "vh"]}``.
-                Each modality must list all of its OlmoEarth bands, in any order.
+                Any subset of a modality's bands, in any order: band sets without any given band are masked
+                as missing, missing bands of a partly given band set are zero.
             temporal_pooling: "mean" averages the time steps (default). "concat" stacks them into
                 channels, giving (B, n_timestamps * D, H', W') for a temporal neck or decoder.
             n_timestamps: Number of time steps, required for "concat".
@@ -161,6 +194,10 @@ class OlmoEarthBackbone(nn.Module):
             fast_pass: Pass no attention mask in training (default True), so SDPA can use its memory-efficient
                 kernels; with a mask it expands to (B, heads, N, N), which runs out of memory at small patch
                 sizes. Exact here, since this wrapper never masks tokens; in eval the encoder skips the mask anyway.
+                With missing band sets (see ``bands``), the masked tokens are removed instead and the attention
+                mask is skipped as long as it masks nothing, which keeps the memory benefit.
+            modality_pooling: "mean" averages the modalities (default). "concat" stacks them into channels in
+                ``bands`` order, giving (B, n_modalities * C, H', W'); needs ``bands``.
         """
         super().__init__()
 
@@ -192,24 +229,53 @@ class OlmoEarthBackbone(nn.Module):
         # Expose embedding dimension for downstream components
         self.num_features = self.embed_dim
 
-        if temporal_pooling not in ("mean", "concat"):
-            msg = f"temporal_pooling must be 'mean' or 'concat', got {temporal_pooling!r}"
+        for name, value in (("temporal_pooling", temporal_pooling), ("modality_pooling", modality_pooling)):
+            if value not in ("mean", "concat"):
+                msg = f"{name} must be 'mean' or 'concat', got {value!r}"
+                raise ValueError(msg)
+        if modality_pooling == "concat" and not bands:
+            msg = "modality_pooling='concat' needs `bands` to know the modalities"
             raise ValueError(msg)
+        self.modality_pooling = modality_pooling
         self.temporal_pooling = temporal_pooling
         self.n_timestamps = n_timestamps
         self.fast_pass = fast_pass
 
-        # bands -> {modality: channel indices in OlmoEarth's band order}
-        self.band_split = {}
+        # bands -> {modality: input channel per band in OlmoEarth's band order, -1 if not given} and
+        # {modality: band sets without any given band, masked as missing}
+        self.band_split, self.missing_band_sets = {}, {}
         offset = 0
         for name, names in (bands or {}).items():
-            order = ModalitySpec.get(name).band_order
+            spec = ModalitySpec.get(name)
             given = [b.lower() for b in names]
-            if sorted(given) != sorted(b.lower() for b in order):
-                msg = f"bands for {name} must be a permutation of {order}, got {names}"
+            unknown = [b for b in names if b.lower() not in [o.lower() for o in spec.band_order]]
+            if unknown or len(set(given)) != len(given):
+                msg = f"bands for {name} must be distinct bands of {spec.band_order}, got {names}"
                 raise ValueError(msg)
-            self.band_split[name] = [offset + given.index(b.lower()) for b in order]
+            self.band_split[name] = [
+                offset + given.index(b.lower()) if b.lower() in given else -1 for b in spec.band_order
+            ]
             offset += len(names)
+            band_sets = [[b.lower() for b in band_set.bands] for band_set in spec.band_sets]
+            self.missing_band_sets[name] = [i for i, bs in enumerate(band_sets) if not set(bs) & set(given)]
+            zeros = [b for bs in band_sets if set(bs) & set(given) for b in bs if b not in given]
+            if zeros:
+                warnings.warn(f"OlmoEarth {name}: bands {zeros} are not given and set to zero.", stacklevel=2)
+        if any(len(m) == len(ModalitySpec.get(n).band_sets) for n, m in self.missing_band_sets.items()):
+            msg = f"every modality in `bands` needs at least one band, got {bands}"
+            raise ValueError(msg)
+        self.has_missing = any(self.missing_band_sets.values())
+        if self.has_missing:
+            # Missing band sets are the same for every sample, so after removing their tokens the attention mask
+            # is all True: skip it, as fast_pass does, so SDPA keeps its memory-efficient kernels.
+            get_attn_mask = self.encoder._maybe_get_attn_mask
+
+            def attn_mask_unless_vacuous(new_mask, fast_pass):
+                return (
+                    None if new_mask is None or bool(new_mask.all()) else get_attn_mask(new_mask, fast_pass=fast_pass)
+                )
+
+            self.encoder._maybe_get_attn_mask = attn_mask_unless_vacuous
 
         self.out_indices = None
         if out_indices:
@@ -229,6 +295,18 @@ class OlmoEarthBackbone(nn.Module):
 
             self.encoder.split_and_expand_per_modality = recording_regroup
 
+            # Without fast_pass, the blocks see the token sequence with masked tokens removed. Record the removal
+            # so captured blocks can be put back in place, as the encoder does for its final output.
+            remove = self.encoder._maybe_remove_masked_tokens
+            self._removal = (None, None)
+
+            def recording_remove(tokens, mask, fast_pass):
+                out = remove(tokens, mask, fast_pass)
+                self._removal = (out[1], out[2])  # indices, new_mask
+                return out
+
+            self.encoder._maybe_remove_masked_tokens = recording_remove
+
     def _capture_hook(self, idx: int) -> Callable:
         def hook(_module, _inputs, output):
             self._captured[idx] = output[0] if isinstance(output, tuple) else output
@@ -239,9 +317,10 @@ class OlmoEarthBackbone(nn.Module):
     def out_channels(self) -> list[int]:
         """Return the output channel dimensions for each feature level."""
         channels = self.embed_dim * (self.n_timestamps if self.temporal_pooling == "concat" else 1)
+        channels *= len(self.band_split) if self.modality_pooling == "concat" else 1
         return [channels] * (len(self.out_indices) if self.out_indices else 1)
 
-    def forward(self, x: Tensor | dict[str, Tensor], timestamps: Tensor | None = None) -> list[Tensor]:
+    def forward(self, x: Tensor | dict[str, Tensor], timestamps: Tensor | None = None, **kwargs) -> list[Tensor]:
         """Forward pass through the OlmoEarth encoder.
 
         Args:
@@ -249,6 +328,7 @@ class OlmoEarthBackbone(nn.Module):
                 OlmoEarth modality name, optionally with a "timestamps" entry.
             timestamps: Optional (B, T, 3) acquisition dates as [day, month, year], months
                 zero-indexed. Defaults to zeros.
+            **kwargs: Other batch entries passed on by TerraTorch tasks, ignored.
 
         Returns:
             List of feature maps of shape (B, out_channels, H', W'), one per output level,
@@ -261,12 +341,20 @@ class OlmoEarthBackbone(nn.Module):
             inputs = {k: v for k, v in x.items() if k != "timestamps"}
             timestamps = x.get("timestamps", timestamps)
         elif self.band_split:
-            inputs = {name: x[:, idx] for name, idx in self.band_split.items()}
+            inputs = {}
+            for name, idx in self.band_split.items():
+                if -1 in idx:  # bands that are not given are zero
+                    data = x.new_zeros(x.shape[0], len(idx), *x.shape[2:])
+                    given = [i for i, j in enumerate(idx) if j >= 0]
+                    data[:, given] = x[:, [idx[i] for i in given]]
+                    inputs[name] = data
+                else:
+                    inputs[name] = x[:, idx]
         else:
             inputs = {self.modality: x}
 
         # OlmoEarth expects raw pixel data in [B, H, W, T, C] format, with a mask of
-        # [B, H, W, T, num_band_sets]. All tokens visible (ONLINE_ENCODER).
+        # [B, H, W, T, num_band_sets]. All tokens visible (ONLINE_ENCODER), except missing band sets.
         sample_kwargs, steps = {}, 1
         for name, data in inputs.items():
             if data.dim() == 4:
@@ -284,6 +372,7 @@ class OlmoEarthBackbone(nn.Module):
                 device=data.device,
                 dtype=torch.long,
             )
+            sample_kwargs[f"{name}_mask"][..., self.missing_band_sets.get(name, [])] = MaskValue.MISSING.value
 
         # Construct timestamps: [B, T, 3] with [day, month, year] as long
         if timestamps is None:
@@ -294,22 +383,30 @@ class OlmoEarthBackbone(nn.Module):
             sample,
             patch_size=self.patch_size,
             input_res=self.input_res,
-            fast_pass=self.fast_pass,
+            fast_pass=self.fast_pass and not self.has_missing,  # missing band sets need token removal
         )
 
         if not self.out_indices:
             return [self._to_feature_map(encoder_output["tokens_and_masks"], inputs)]
         captured = [self._captured[i] for i in self.out_indices]
         self._captured = {}
+        indices, new_mask = self._removal
+        if indices is not None:
+            captured = [self.encoder.add_removed_tokens(tokens, indices, new_mask)[0] for tokens in captured]
         return [self._to_feature_map(self._regroup(tokens, self._dims), inputs) for tokens in captured]
 
     def _to_feature_map(self, tokens_and_masks, inputs: dict[str, Tensor]) -> Tensor:
         """(B, H', W', T, band_sets, D) per modality -> (B, out_channels, H', W')."""
+        if self.modality_pooling == "concat" and list(inputs) != list(self.band_split):
+            msg = f"modality_pooling='concat' expects the modalities {list(self.band_split)}, got {list(inputs)}"
+            raise ValueError(msg)
         maps = []
         for name in inputs:
-            tokens = (
-                tokens_and_masks[name] if isinstance(tokens_and_masks, dict) else getattr(tokens_and_masks, name)
-            ).mean(dim=4)  # average band sets -> (B, H', W', T, D)
+            tokens = tokens_and_masks[name] if isinstance(tokens_and_masks, dict) else getattr(tokens_and_masks, name)
+            missing = self.missing_band_sets.get(name)
+            if missing:  # average only the given band sets
+                tokens = tokens[..., [i for i in range(tokens.shape[4]) if i not in missing], :]
+            tokens = tokens.mean(dim=4)  # average band sets -> (B, H', W', T, D)
             if self.temporal_pooling == "mean":
                 tokens = tokens.mean(dim=3)
             else:
@@ -320,7 +417,12 @@ class OlmoEarthBackbone(nn.Module):
                     raise ValueError(msg)
                 tokens = tokens.flatten(start_dim=3)  # (B, H', W', T * D)
             maps.append(tokens)
-        features = maps[0] if len(maps) == 1 else torch.stack(maps).mean(dim=0)
+        if len(maps) == 1:
+            features = maps[0]
+        elif self.modality_pooling == "concat":
+            features = torch.cat(maps, dim=-1)  # (B, H', W', n_modalities * C)
+        else:
+            features = torch.stack(maps).mean(dim=0)
         # Reshape to (B, D, H', W') for compatibility with TerraTorch decoders
         return features.permute(0, 3, 1, 2)
 
@@ -337,6 +439,7 @@ def _create_olmoearth_backbone(
     n_timestamps: int = 1,
     out_indices: list[int] | None = None,
     fast_pass: bool = True,
+    modality_pooling: str = "mean",
     **kwargs,
 ) -> OlmoEarthBackbone:
     """Create an OlmoEarth backbone model.
@@ -369,6 +472,7 @@ def _create_olmoearth_backbone(
         n_timestamps=n_timestamps,
         out_indices=out_indices,
         fast_pass=fast_pass,
+        modality_pooling=modality_pooling,
     )
 
     return model

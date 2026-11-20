@@ -50,18 +50,33 @@ the lighter `olmoearth-pretrain-minimal`; both work.
     }
     ```
 
-- Input: `[B, C, H, W]` or a time series `[B, C, T, H, W]`. Without `bands`, the input is one `modality` (default
-  `sentinel2_l2a`) in OlmoEarth's band order. A dict `{modality: tensor, "timestamps": ...}` works as well.
+- Input: `[B, C, H, W]` or a time series `[B, C, T, H, W]`. `bands` lists the input channels per modality, in input
+  order; it can be a subset, e.g. RGBN: band sets without any given band are masked as missing (v1.2 was trained with
+  band dropout), missing bands of a partly given band set are zero. Without `bands`, the input is one `modality`
+  (default `sentinel2_l2a`) with all bands in OlmoEarth's order. A dict `{modality: tensor}` works as well.
 - Output: feature maps `[B, D, H / patch_size, W / patch_size]`, averaged over band sets and modalities.
+  `modality_pooling: concat` stacks the modalities instead (`[B, n_modalities * D, ...]`).
 - `temporal_pooling`: `mean` (default) or `concat` (time stacked into channels, needs `n_timestamps`).
 - `fast_pass` (default `True`) skips the attention mask, which otherwise runs out of memory at small patch sizes.
 - Do not use `backbone_use_temporal`: OlmoEarth encodes the time series itself.
 
 ## Tips
 
-- **Normalization**: OlmoEarth was pre-trained on raw values (Sentinel-2 L2A digital numbers, Sentinel-1 in dB),
-  mapped from `mean ± 2·std` to `[0, 1]` with the statistics in `olmoearth_pretrain*/data/norm_configs/computed.json`.
-  To reproduce this with the TerraTorch datamodules, set `means` to `mean - 2·std` and `stds` to `4·std`.
+- **Normalization**: OlmoEarth expects raw values (Sentinel-2 L2A digital numbers, Sentinel-1 in dB) mapped from
+  `mean ± 2·std` to `[0, 1]` with its pre-training statistics. Inputs standardized with dataset statistics look
+  plausible but do not match. Get datamodule `means` and `stds` that reproduce it:
+
+    ```python
+    from terratorch.models.backbones.olmoearth import olmoearth_normalization
+
+    means, stds = olmoearth_normalization({"sentinel2_l2a": ["B04", "B03", "B02", "B08"]})
+    ```
+
+- **Dates**: acquisition dates default to zeros. Pass them as `timestamps` `[B, T, 3]` (`[day, month, year]`, months
+  0 to 11): add a `timestamps` entry to the batch (TerraTorch tasks pass extra batch entries to the backbone) or to a
+  dict input.
+- **Sequence length**: OlmoEarth was pre-trained with up to 12 time steps (`max_sequence_length`). Longer series
+  run, but are outside the pre-training range.
 - **Memory**: the encoder attends over `(H / patch_size)² · T · band sets` tokens (Sentinel-2 has 3 band sets,
   Sentinel-1 one). Halving the patch size quadruples the tokens; keep `fast_pass: True` for small patch sizes.
 - **Time series**: with `temporal_pooling: concat`, a learned temporal pooling neck (`TemporalPooling`) can weight the
