@@ -56,8 +56,8 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
 - **Memory**: each band group is a separate token, so the encoder attends over about
   `(H / patch_size)² · (7 · T + 3)` tokens. At 256 px, `patch_size: 16` keeps this manageable; smaller patch sizes
   quadruple the tokens per halving.
-- **NDVI**: Galileo has an NDVI band. Add it as an input channel named `NDVI`, `(B8 - B4) / (B8 + B4)`; otherwise
-  its band group is masked.
+- **NDVI**: Galileo has an NDVI band. Add it as an input channel named `NDVI`, `(B8 - B4) / (B8 + B4)`, left
+  unnormalized (mean 0, std 1), as in Galileo; otherwise its band group is masked.
 - **Time series**: with `temporal_pooling: concat`, a learned temporal pooling neck (`TemporalPooling`) can weight the
   time steps instead of averaging them.
 - **Frozen encoder**: works with `freeze_backbone: True`.
