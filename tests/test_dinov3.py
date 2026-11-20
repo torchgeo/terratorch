@@ -56,3 +56,37 @@ def test_model_different_img_size():
     output = model.forward(dummy_input)
     assert output[0].shape[0] == 1
     gc.collect()
+
+
+S2_S1_DEM = ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B9", "B11", "B12", "VV", "VH", "DEM"]
+
+
+@pytest.mark.parametrize(("name", "conv"), [("dinov3_vits16", "patch_embed.proj"), ("dinov3_convnext_tiny", "stem")])
+def test_multispectral_bands_graft_rgb(name, conv):
+    torch.manual_seed(0)
+    rgb = DinoV3Wrapper(model=name)
+    torch.manual_seed(0)  # same init, so the RGB kernels match the 3-channel model's
+    model = DinoV3Wrapper(model=name, bands=S2_S1_DEM)
+    get = (
+        (lambda m: m.dinov3.patch_embed.proj)
+        if conv == "patch_embed.proj"
+        else (lambda m: m.dinov3.downsample_layers[0][0])
+    )
+    old, new = get(rgb).weight, get(model).weight
+    assert new.shape[1] == len(S2_S1_DEM)
+    for src, band in enumerate(["B4", "B3", "B2"]):  # pretrained channel order is RGB
+        assert torch.equal(new[:, S2_S1_DEM.index(band)], old[:, src])
+    with torch.no_grad():
+        out = model(torch.randn(1, len(S2_S1_DEM), 64, 64))
+    assert out[0].shape[0] == 1
+    gc.collect()
+
+
+def test_hls_band_names_and_norm():
+    model = DinoV3Wrapper(
+        model="dinov3_convnext_tiny", bands=["BLUE", "GREEN", "RED", "NIR_NARROW"], norm=False, return_cls_token=False
+    )
+    with torch.no_grad():
+        out = model(torch.randn(1, 4, 64, 64))
+    assert [o.shape for o in out] == [(1, 256, 96), (1, 64, 192), (1, 16, 384), (1, 4, 768)]
+    gc.collect()
