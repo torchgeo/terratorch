@@ -91,6 +91,7 @@ nav:
       - Model Registry: guide/registry.md
       - Encoder-Decoder Factory: guide/encoder_decoder_factory.md
       - TerraMind: guide/terramind.md
+      - DINOv3: guide/dinov3.md
       - Prithvi EO: guide/prithvi_eo.md
       - Temporal Wrapper: guide/temporal_wrapper.md
 # TODO Add guide for a general approach to a new use case
