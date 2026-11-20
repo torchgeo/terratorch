@@ -41,7 +41,7 @@ Please also copy the ONNX model to the /dist folder before. You can get it from:
 This app is built on [Carbon Web Components](https://carbondesignsystem.com/developing/frameworks/web-components/) using [Vite](https://vite.dev/).
 
 1. Install all packages using `pnpm i`
-2. Install PWA with vite using `npm install vite-plugin-pwa --save-dev`
+2. Install PWA with vite using `pnpm add -D vite-plugin-pwa`
 3. Run locally to test changes using `pnpm dev`
 4. Build changes into the `dist` folder using `pnpm build`
 5. From the `dist` folder, run `python3 -m http.server`

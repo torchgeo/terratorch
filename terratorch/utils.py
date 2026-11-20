@@ -1,11 +1,37 @@
 import math
 from collections import Counter
 from typing import Dict, Union
+from urllib.parse import unquote, urlparse
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+_ALLOWED_URL_SCHEMES = ("http", "https")
+
+
+def check_url_scheme(url: str) -> str:
+    """Reject non-HTTP(S) URLs (e.g. ``file://``) before handing them to urllib."""
+    scheme = urlparse(url).scheme.lower()
+    if scheme not in _ALLOWED_URL_SCHEMES:
+        raise ValueError(f"Unsupported URL scheme {scheme!r}; only http and https are allowed")
+    return url
+
+
+def parse_hf_url(url: str) -> tuple[str, str | None, str]:
+    """Split a Hugging Face file URL into ``(repo_id, revision, filename)``.
+
+    Hugging Face file URLs look like ``https://hf.co/<repo_id>/resolve/<revision>/<path/to/file>``.
+    ``filename`` keeps the full path inside the repository, so files in subdirectories work.
+    If only one segment follows ``/resolve/``, it is taken as the filename and ``revision``
+    is ``None`` (the default branch is used).
+    """
+    repo_id, _, rest = url.replace("https://hf.co/", "", 1).partition("/resolve/")
+    parts = [p for p in rest.split("/") if p]
+    if len(parts) > 1:
+        return repo_id, unquote(parts[0]), "/".join(parts[1:])
+    return repo_id, None, parts[0] if parts else ""
 
 
 # Special Exception to handle cases in which the model is missing from the

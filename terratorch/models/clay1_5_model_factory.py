@@ -219,7 +219,11 @@ def _resolve_checkpoint(checkpoint_path: str | None) -> str | None:
     try:
         from huggingface_hub import hf_hub_download
         logger.info("Downloading Clay v1.5 checkpoint from HuggingFace...")
-        return hf_hub_download(repo_id="made-with-clay/Clay", filename="v1.5/clay-v1.5.ckpt")
+        return hf_hub_download(
+            repo_id="made-with-clay/Clay",
+            filename="v1.5/clay-v1.5.ckpt",
+            revision="70200ebcccdf67bf2a0cb9984c77ddee26c10ed2",
+        )
     except Exception as e:
         logger.warning(f"Could not load pretrained weights: {e}")
         return None

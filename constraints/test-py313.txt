@@ -216,7 +216,7 @@ lightly==1.5.22
     #   torchgeo
 lightly-utils==0.0.2
     # via lightly
-lightning==2.6.5
+lightning==2.6.6
     # via
     #   terratorch (pyproject.toml)
     #   torchgeo
@@ -512,7 +512,7 @@ python-dateutil==2.9.0.post0
     #   lightly
     #   matplotlib
     #   pandas
-pytorch-lightning==2.6.5
+pytorch-lightning==2.6.6
     # via
     #   lightly
     #   lightning

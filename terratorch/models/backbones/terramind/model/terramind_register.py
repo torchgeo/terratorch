@@ -75,18 +75,22 @@ pretrained_weights = {
     },
     "terramind_v1_tiny": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-tiny",
+        "hf_hub_revision": "2b5ac0a3ed7dd7e922ccfd595b56607f342df343",
         "hf_hub_filename": "TerraMind_v1_tiny.pt",
     },
     "terramind_v1_small": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-small",
+        "hf_hub_revision": "960f7549bfe9d7a08946860042f83badd604c779",
         "hf_hub_filename": "TerraMind_v1_small.pt",
     },
     "terramind_v1_base": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-base",
+        "hf_hub_revision": "fb96c70d0a5f68dcc44030b89cbfd8ec3fb0c67a",
         "hf_hub_filename": "TerraMind_v1_base.pt",
     },
     "terramind_v1_large": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-large",
+        "hf_hub_revision": "3ca567c5494310528269402a96ba4f13ceefc87c",
         "hf_hub_filename": "TerraMind_v1_large.pt",
     },
 }
@@ -512,6 +516,7 @@ def build_terrammind_vit(
     ckpt_path: str | None = None,
     bands: dict[str, list] | None = None,
     pretrained_bands: dict[str, list] | None = None,
+    hf_hub_revision: str | None = None,
     **kwargs,
 ):
 
@@ -529,7 +534,9 @@ def build_terrammind_vit(
     elif pretrained:
         # Load model from Hugging Face
         state_dict_file = hf_hub_download(
-            repo_id=pretrained_weights[variant]["hf_hub_id"], filename=pretrained_weights[variant]["hf_hub_filename"]
+            repo_id=pretrained_weights[variant]["hf_hub_id"],
+            filename=pretrained_weights[variant]["hf_hub_filename"],
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn(state_dict, model)
@@ -541,7 +548,13 @@ def build_terrammind_vit(
     return model
 
 
-def build_terrammind_encdec(variant: str = None, pretrained: bool = False, ckpt_path: str | None = None, **kwargs):
+def build_terrammind_encdec(
+    variant: str = None,
+    pretrained: bool = False,
+    ckpt_path: str | None = None,
+    hf_hub_revision: str | None = None,
+    **kwargs,
+):
 
     model = TerraMind(**kwargs)
 
@@ -557,7 +570,9 @@ def build_terrammind_encdec(variant: str = None, pretrained: bool = False, ckpt_
     elif pretrained:
         # Load model from Hugging Face
         state_dict_file = hf_hub_download(
-            repo_id=pretrained_weights[variant]["hf_hub_id"], filename=pretrained_weights[variant]["hf_hub_filename"]
+            repo_id=pretrained_weights[variant]["hf_hub_id"],
+            filename=pretrained_weights[variant]["hf_hub_filename"],
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn(state_dict, model)
@@ -572,6 +587,7 @@ def build_terrammind_tim(
     ckpt_path: str | None = None,
     bands: dict[str, list] | None = None,
     pretrained_bands: dict[str, list] | None = None,
+    hf_hub_revision: str | None = None,
     **kwargs,
 ):
 
@@ -602,7 +618,9 @@ def build_terrammind_tim(
 
         # Load model from Hugging Face
         state_dict_file = hf_hub_download(
-            repo_id=pretrained_weights[variant]["hf_hub_id"], filename=pretrained_weights[variant]["hf_hub_filename"]
+            repo_id=pretrained_weights[variant]["hf_hub_id"],
+            filename=pretrained_weights[variant]["hf_hub_filename"],
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn_tim(state_dict, model)
@@ -613,7 +631,13 @@ def build_terrammind_tim(
     return model
 
 
-def build_terrammind_generate(variant: str = None, pretrained: bool = False, ckpt_path: str | None = None, **kwargs):
+def build_terrammind_generate(
+    variant: str = None,
+    pretrained: bool = False,
+    ckpt_path: str | None = None,
+    hf_hub_revision: str | None = None,
+    **kwargs,
+):
 
     model = TerraMindGeneration(pretrained=pretrained, **kwargs)
 
@@ -629,7 +653,9 @@ def build_terrammind_generate(variant: str = None, pretrained: bool = False, ckp
     elif pretrained:
         # Load model from Hugging Face
         state_dict_file = hf_hub_download(
-            repo_id=pretrained_weights[variant]["hf_hub_id"], filename=pretrained_weights[variant]["hf_hub_filename"]
+            repo_id=pretrained_weights[variant]["hf_hub_id"],
+            filename=pretrained_weights[variant]["hf_hub_filename"],
+            revision=hf_hub_revision or pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn_generate(state_dict, model)
