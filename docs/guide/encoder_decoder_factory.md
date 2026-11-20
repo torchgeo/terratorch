@@ -66,6 +66,20 @@ Out[24]:
 
 ```
 
+### Flexible patch size
+
+`backbone_patch_resize` changes the effective patch size of any encoder, FlexiViT-style, as OlmoEarth's
+`FlexiPatchEmbed` does: the input is resized so that one native patch covers `backbone_patch_resize` input
+pixels, and the pretrained patch embedding is used unchanged (see `terratorch.models.utils.PatchResize`).
+This is useful for encoders whose patch size is fixed by the checkpoint, such as TerraMind and Prithvi.
+Labels keep their resolution. With `backbone_use_temporal`, each time step is resized.
+
+```yaml
+backbone: terramind_v1_base
+backbone_patch_resize: 8            # 256 px input -> 512 px -> 32 x 32 tokens
+backbone_patch_resize_native: 16    # the encoder's patch size (default 16)
+```
+
 ## Necks
 
 Necks are the connectors between encoder and decoder. They can perform operations such as selecting elements from the output of the encoder ([SelectIndices][terratorch.models.necks.SelectIndices]), reshaping the outputs of ViTs so they are compatible with CNNs ([ReshapeTokensToImage][terratorch.models.necks.ReshapeTokensToImage]), amongst others.

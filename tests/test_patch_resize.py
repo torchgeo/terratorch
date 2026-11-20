@@ -1,0 +1,62 @@
+# Copyright contributors to the Terratorch project
+
+import gc
+
+import pytest
+import torch
+
+from terratorch.models.utils import PatchResize, TemporalWrapper, _get_backbone
+
+
+@pytest.mark.parametrize(("patch_size", "grid"), [(16, 16), (8, 32), (4, 64)])
+def test_prithvi_token_grid(patch_size, grid):
+    model = _get_backbone(
+        "prithvi_eo_v2_tiny_tl",
+        patch_resize=patch_size,
+        pretrained=False,
+        num_frames=2,
+        img_size=256,
+        bands=["BLUE", "GREEN", "RED"],
+    )
+    assert isinstance(model, PatchResize) and model.patch_size == patch_size
+    with torch.no_grad():
+        out = model(torch.randn(1, 3, 2, 256, 256))
+    assert (out[-1].shape[1] - 1) // 2 == grid**2  # cls token, then grid tokens per time step
+    gc.collect()
+
+
+def test_terramind_dict_input_inside_temporal_wrapper():
+    model = _get_backbone(
+        "terramind_v1_tiny",
+        patch_resize=8,
+        use_temporal=True,
+        temporal_pooling="mean",
+        pretrained=False,
+        modalities=["S2L2A", "S1RTC"],
+    )
+    assert isinstance(model, TemporalWrapper) and isinstance(model.encoder, PatchResize)
+    x = {"S2L2A": torch.randn(1, 12, 2, 64, 64), "S1RTC": torch.randn(1, 2, 2, 64, 64)}
+    with torch.no_grad():
+        out = model(x)
+    assert out[-1].shape[1] == 8**2  # 64 px at patch size 8
+    gc.collect()
+
+
+def test_encoder_decoder_factory():
+    from terratorch.models import EncoderDecoderFactory
+
+    model = EncoderDecoderFactory().build_model(
+        task="segmentation",
+        backbone="terramind_v1_tiny",
+        backbone_pretrained=False,
+        backbone_modalities=["S2L2A"],
+        backbone_patch_resize=8,
+        necks=[{"name": "ReshapeTokensToImage"}],
+        decoder="FCNDecoder",
+        num_classes=2,
+    )
+    model.eval()
+    with torch.no_grad():
+        out = model({"S2L2A": torch.randn(1, 12, 64, 64)}).output
+    assert out.shape == (1, 2, 64, 64)
+    gc.collect()

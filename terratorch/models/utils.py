@@ -153,11 +153,18 @@ def _get_backbone(backbone: str | nn.Module, **backbone_kwargs) -> nn.Module:
     n_timestamps = backbone_kwargs.pop("temporal_n_timestamps", None)
     features_permute_op = backbone_kwargs.pop("temporal_features_permute_op", None)
     subset_lengths = backbone_kwargs.pop("temporal_subset_lengths", None)
+    patch_resize = backbone_kwargs.pop("patch_resize", None)
+    patch_resize_native = backbone_kwargs.pop("patch_resize_native", 16)
+    patch_resize_interpolation = backbone_kwargs.pop("patch_resize_interpolation", "bilinear")
 
     if isinstance(backbone, nn.Module):
         model = backbone
     else:
         model = BACKBONE_REGISTRY.build(backbone, **backbone_kwargs)
+
+    # FlexiViT-style effective patch size; inside the TemporalWrapper, so it resizes each time step
+    if patch_resize is not None:
+        model = PatchResize(model, patch_resize, patch_resize_native, patch_resize_interpolation)
 
     # Apply TemporalWrapper inside _get_backbone
     if use_temporal:
@@ -171,6 +178,51 @@ def _get_backbone(backbone: str | nn.Module, **backbone_kwargs) -> nn.Module:
         )
 
     return model
+
+
+class PatchResize(nn.Module):
+    """FlexiViT-style flexible patch size for any backbone, by resizing its input.
+
+    Resizes the input so that one native patch of the backbone covers ``patch_size`` input pixels,
+    the way OlmoEarth's ``FlexiPatchEmbed`` (after FlexiViT, Beyer et al. 2023,
+    https://arxiv.org/abs/2212.08013) handles a requested patch size other than its base one. The
+    pretrained patch embedding is used unchanged. Use it for backbones whose patch size is fixed by
+    the checkpoint: TerraMind ignores ``patch_size``, and Prithvi drops its pretrained patch embedding
+    when the kernel shape changes. E.g. ``patch_size=8`` with ``native_patch_size=16`` resizes a
+    256 px input to 512 px, giving a 32 x 32 token grid.
+
+    Only the backbone input is resized; labels keep their resolution and the decoder upsamples to it
+    as usual. Set it from a model config with ``backbone_patch_resize: 8`` (and optionally
+    ``backbone_patch_resize_native``, ``backbone_patch_resize_interpolation``).
+
+    Args:
+        encoder: The wrapped backbone. Its ``out_channels`` are passed through.
+        patch_size: Effective patch size in input pixels.
+        native_patch_size: Patch size the backbone tokenizes at.
+        interpolation: ``F.interpolate`` mode.
+    """
+
+    def __init__(
+        self, encoder: nn.Module, patch_size: int, native_patch_size: int = 16, interpolation: str = "bilinear"
+    ) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.patch_size = patch_size  # used by the model factories to pad inputs
+        self.scale = native_patch_size / patch_size
+        self.interpolation = interpolation
+        self.out_channels = encoder.out_channels
+
+    def _resize(self, x: torch.Tensor) -> torch.Tensor:
+        """Resize the last two dims, for inputs of any rank, e.g. (B, C, T, H, W)."""
+        h, w = x.shape[-2:]
+        size = (round(h * self.scale), round(w * self.scale))
+        flat = nn.functional.interpolate(x.reshape(-1, 1, h, w), size=size, mode=self.interpolation)
+        return flat.reshape(*x.shape[:-2], *size)
+
+    def forward(self, x: torch.Tensor | dict[str, torch.Tensor], *args, **kwargs):
+        if self.scale != 1:
+            x = {k: self._resize(v) for k, v in x.items()} if isinstance(x, dict) else self._resize(x)
+        return self.encoder(x, *args, **kwargs)
 
 
 class TemporalWrapper(nn.Module):
