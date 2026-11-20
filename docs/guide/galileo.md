@@ -46,3 +46,20 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
 - `temporal_pooling`: `mean` (default) or `concat` (time stacked into channels, needs `n_timestamps`).
 - `months` (`[B, T]`, zero-indexed) can be passed to the forward call; defaults to 0.
 - Do not use `backbone_use_temporal`: Galileo encodes the time series itself.
+
+## Tips
+
+- **Normalization**: Galileo was pre-trained on raw values (Sentinel-2 digital numbers, Sentinel-1 in dB, elevation
+  in meters), mapped from `mean ± 2·std` to `[0, 1]` with the statistics in Galileo's
+  [`config/normalization.json`](https://github.com/nasaharvest/galileo/blob/main/config/normalization.json). To
+  reproduce this with the TerraTorch datamodules, set `means` to `mean - 2·std` and `stds` to `4·std`.
+- **Memory**: each band group is a separate token, so the encoder attends over about
+  `(H / patch_size)² · (7 · T + 3)` tokens. At 256 px, `patch_size: 16` keeps this manageable; smaller patch sizes
+  quadruple the tokens per halving.
+- **NDVI**: Galileo has an NDVI band. Add it as an input channel named `NDVI`, `(B8 - B4) / (B8 + B4)`; otherwise
+  its band group is masked.
+- **Time series**: with `temporal_pooling: concat`, a learned temporal pooling neck (`TemporalPooling`) can weight the
+  time steps instead of averaging them.
+- **Frozen encoder**: works with `freeze_backbone: True`.
+
+See the [Galileo repository](https://github.com/nasaharvest/galileo) for the band definitions and pre-training data.
