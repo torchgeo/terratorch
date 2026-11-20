@@ -45,3 +45,42 @@ def test_conv_merges_time_and_channels():
     conv = neck.tmap[0]
     expected = torch.einsum("oi,bihw->bohw", conv.weight[:, :, 0, 0], x) + conv.bias[None, :, None, None]
     assert torch.allclose(neck([x, torch.randn(B, 2 * C * T, H, H)])[0], expected, atol=1e-5)
+
+
+def test_max_diff_subsets_and_passthrough():
+    x = torch.cat([torch.full((B, C, H, H), float(t)) for t in range(T)], dim=1)
+    assert torch.all(TemporalPooling([C * T], T, "max")([x])[0] == T - 1)
+    # subsets [1, 3]: means 0 and 2, diff = first - second = -2
+    out = TemporalPooling([C * T], T, "diff", subset_lengths=[1, 3])([x])[0]
+    assert out.shape == (B, C, H, H) and torch.all(out == -2)
+    for pooling in ("keep", "concat"):
+        neck = TemporalPooling([C * T], T, pooling)
+        assert neck([x])[0] is x and neck.process_channel_list([C * T]) == [C * T]
+    with pytest.raises(ValueError, match="exactly two subsets"):
+        TemporalPooling([C * T], T, "diff", subset_lengths=[1, 1, 2])
+
+
+def test_token_dim():
+    """(B, N, T*D) tokens pooled over T with dim=2, e.g. before ReshapeTokensToImage."""
+    tokens = torch.randn(B, 16, T * C)
+    out = TemporalPooling([C * T], T, "mean", dim=2)([tokens])[0]
+    assert torch.allclose(out, tokens.unflatten(2, (T, C)).mean(dim=2))
+    assert TemporalPooling([C * T], T, "linear", dim=-1)([tokens])[0].shape == (B, 16, C)
+    with pytest.raises(ValueError, match="dim=1"):
+        TemporalPooling([C * T], T, "conv", dim=2)
+
+
+@pytest.mark.parametrize("pooling", ["linear", "conv"])
+def test_temporal_wrapper_learned_pooling_matches_neck(pooling):
+    """TemporalWrapper(pooling) == TemporalWrapper(concat) + TemporalPooling neck, same weights."""
+    from terratorch.models.utils import TemporalWrapper
+
+    encoder = torch.nn.Conv2d(3, C, 1)
+    encoder.out_channels = [C]
+    wrapped = TemporalWrapper(encoder, pooling=pooling, n_timestamps=T)
+    concat = TemporalWrapper(encoder, pooling="concat", n_timestamps=T)
+    neck = TemporalPooling(concat.out_channels, T, pooling)
+    neck.load_state_dict(wrapped.temporal_pooling.state_dict())
+    assert wrapped.out_channels == [C]
+    x = torch.randn(B, 3, T, H, H)
+    assert torch.allclose(wrapped(x)[0], neck(concat(x))[0], atol=1e-6)

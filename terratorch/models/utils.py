@@ -188,7 +188,7 @@ class TemporalWrapper(nn.Module):
 
         Args:
             encoder (nn.Module): The feature extractor (backbone).
-            pooling (str): Type of pooling ('keep', 'concat', 'mean', 'max', 'diff'), 'diff' requires exactly two temporal elements after optional subset aggregation.
+            pooling (str): Type of pooling ('keep', 'concat', 'mean', 'max', 'diff', 'linear', 'conv'), see\n                ``terratorch.models.necks.TemporalPooling``. 'diff' requires exactly two temporal elements after optional\n                subset aggregation; 'linear' and 'conv' are learned and need ``n_timestamps``.
             concat (bool): Deprecated - 'concat' now integrated as pooling option.
             n_timestamps (int): Used to compute backbone out_channels when constructing encoder–decoder pipelines in case of 'concat' pooling.
             features_permute_op (list): Permutation operation to perform on the features before aggregation.
@@ -207,29 +207,24 @@ class TemporalWrapper(nn.Module):
                 "'concat' is deprecated in TemporalWrapper. Use pooling='concat' instead.", DeprecationWarning
             )
 
-        # Check supported pooling modes
-        supported_poolings = ["mean", "max", "diff", "keep", "concat"]
-        if pooling not in supported_poolings:
-            raise ValueError(f"Unsupported pooling '{pooling}', choose from {supported_poolings}.")
+        from terratorch.models.necks import TemporalPooling
+
+        # Learned poolings need the encoder's channels per time step to size their weights.
+        learned = pooling in ("linear", "conv")
+        if learned and not (hasattr(encoder, "out_channels") and n_timestamps):
+            msg = f"'{pooling}' pooling needs n_timestamps and an encoder with out_channels."
+            raise ValueError(msg)
+        self.temporal_pooling = TemporalPooling(
+            [c * n_timestamps for c in encoder.out_channels] if learned else [],
+            n_timestamps=n_timestamps,
+            pooling=pooling,
+            subset_lengths=subset_lengths,
+        )
 
         self.encoder = encoder
         self.pooling = pooling
         self.features_permute_op = features_permute_op
         self.subset_lengths = subset_lengths
-
-        # Validate subset_lengths defines two subsets for diff pooling and matches n_timestamps if set
-        if subset_lengths is not None:
-            if pooling == "diff" and len(subset_lengths) != 2:
-                raise ValueError(
-                    f"`diff` pooling requires exactly two subsets in `subset_lengths`, "
-                    f"but got {len(subset_lengths)}: {subset_lengths}"
-                )
-
-            if n_timestamps is not None and sum(subset_lengths) != n_timestamps:
-                raise ValueError(
-                    f"The sum of `subset_lengths` must equal `n_timestamps` "
-                    f"(got sum={sum(subset_lengths)}, n_timestamps={n_timestamps})."
-                )
 
         # Precompute reverse permutation for restoring original dims after processing
         if features_permute_op is not None:
@@ -253,41 +248,9 @@ class TemporalWrapper(nn.Module):
             else:
                 self.out_channels = encoder.out_channels
 
-    def pool_temporal(self, stacked: torch.Tensor, pooling: str, subset_lengths: list[int] | None):
-        """
-        Pool per-timestep outputs based on the specified pooling method.
-        """
-
-        T = stacked.shape[1]  # number of timesteps
-
-        if subset_lengths is not None:
-            if sum(subset_lengths) != T:
-                raise ValueError(f"Sum of `subset_lengths` ({sum(subset_lengths)}) must equal timesteps ({T}).")
-
-            # Split into subsets and average within each
-            subset_splits = torch.split(stacked, subset_lengths, dim=1)
-            stacked = torch.stack([subset.mean(dim=1) for subset in subset_splits], dim=1)
-
-        if pooling == "concat":
-            return stacked.flatten(1, 2)  # concat over time: [B, T*C, H, W]
-
-        elif pooling == "max":
-            return torch.max(stacked, dim=1).values  # max over time: [B, C, H, W]
-
-        elif pooling == "diff":
-            if stacked.shape[1] != 2:
-                raise ValueError(
-                    f"`diff` pooling requires exactly two temporal elements "
-                    f"(from input or after subset aggregation), got {stacked.shape[1]}. "
-                    f"Consider to use `subset_lengths` to define two subsets."
-                )
-            return stacked[:, 0] - stacked[:, 1]  # difference between two timesteps: [B, C, H, W]
-
-        elif pooling == "mean":
-            return torch.mean(stacked, dim=1)  # mean over time: [B, C, H, W]
-
-        else:
-            return stacked  # "keep": return [B, T, C, H, W] sequence
+    def pool_temporal(self, stacked: torch.Tensor, level: int = 0) -> torch.Tensor:
+        """Pool per-timestep outputs [B, T, C, ...] over T, see ``TemporalPooling``."""
+        return self.temporal_pooling.pool(stacked, level=level, dim=1)
 
     def reshape_5d(self, tensor: torch.Tensor, B: int, T: int) -> torch.Tensor:
         """
@@ -358,7 +321,7 @@ class TemporalWrapper(nn.Module):
         outputs = []
 
         # Postprocess each feature map returned by encoder (layer outputs)
-        for feature_map in feat:
+        for level, feature_map in enumerate(feat):
             if isinstance(feature_map, dict):  # multimodal output
                 mod_keys = feature_map.keys()
                 pooled = {}
@@ -370,7 +333,7 @@ class TemporalWrapper(nn.Module):
                     mod_stacked = self.reshape_5d(feature_map[k], B, T)
 
                     # Temporal pooling
-                    pooled[k] = self.pool_temporal(mod_stacked, self.pooling, self.subset_lengths)
+                    pooled[k] = self.pool_temporal(mod_stacked, level)
 
                     # Reverse permutation to restore original dim order
                     pooled[k] = self.permute_op(pooled[k], self.reverse_permute_op)
@@ -382,7 +345,7 @@ class TemporalWrapper(nn.Module):
             else:  # single-modality feature map
                 feature_map = self.permute_op(feature_map, self.features_permute_op)
                 stacked = self.reshape_5d(feature_map, B, T)
-                pooled = self.pool_temporal(stacked, self.pooling, self.subset_lengths)
+                pooled = self.pool_temporal(stacked, level)
                 pooled = self.permute_op(pooled, self.reverse_permute_op)
 
                 if pooled.shape[-1] == 1:

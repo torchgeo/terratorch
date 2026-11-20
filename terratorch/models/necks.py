@@ -386,12 +386,16 @@ class LearnedInterpolateToPyramidal(Neck):
 
 @TERRATORCH_NECK_REGISTRY.register
 class TemporalPooling(Neck):
-    """Reduce time-concatenated feature maps (B, T*C, H, W) to (B, C, H, W).
+    """Pool features over time steps (or any other inputs) concatenated along ``dim``.
 
-    Multi-temporal backbones often stack time into channels: ``ReshapeTokensToImage`` with
-    ``effective_time_dim=T`` (e.g. Prithvi), or the temporal wrapper with ``pooling: concat``.
-    This neck pools over time afterwards, so every backbone can use the same temporal pooling,
-    and the decoder width no longer grows with T.
+    As a neck, each feature has the time steps concatenated along ``dim``, e.g. (B, T*C, H, W) from
+    ``ReshapeTokensToImage(effective_time_dim=T)`` or a ``TemporalWrapper`` with ``pooling: concat``.
+    It is split into (B, T, C, H, W) and pooled over T. Another ``dim`` pools e.g. token sequences
+    (B, N, T*D) with ``dim: 2``. Nothing here is specific to time: modalities concatenated along
+    channels (e.g. TerraMind ``merge_method: concat``) are pooled the same way, with
+    ``n_timestamps`` set to the number of modalities.
+
+    The ``TemporalWrapper`` pools with this class too, on its stacked (B, T, C, ...) features.
 
     ```yaml
     necks:
@@ -403,41 +407,114 @@ class TemporalPooling(Neck):
     ```
 
     Args:
-        channel_list: Channels per feature map, each a multiple of ``n_timestamps``.
-        n_timestamps: Number of time steps concatenated into the channel axis.
-        pooling: How the time steps are merged, per feature map:
-            "mean": parameter-free average.
+        channel_list: Channels per feature, each ``n_timestamps`` times the channels per time step.
+        n_timestamps: Number of concatenated time steps (or inputs).
+        pooling: How the time steps are merged, per feature:
+            "mean" / "max": average / maximum over time.
+            "diff": first minus second time step; needs exactly two (after ``subset_lengths``).
             "linear": learned weighted sum over time, ``nn.Linear(T, 1)`` shared across channels
             (T + 1 parameters), like ``multi_temporal_strategy: linear`` in PANGAEA-bench.
             "conv": learned merge of all time steps and channels, a 1x1 ``nn.Conv2d(T*C, C)``
-            (T*C*C + C parameters), so time steps can be weighted per channel and channels mixed.
+            (T*C*C + C parameters). Needs ``dim=1``.
+            "concat" / "keep": no pooling, the features are returned unchanged.
+        dim: Dimension along which the time steps are concatenated.
+        subset_lengths: If set, average consecutive groups of time steps first (e.g. [2, 3]: the first
+            2 and the last 3), then pool over the group means.
     """
 
-    def __init__(self, channel_list: list[int], n_timestamps: int, pooling: str = "mean") -> None:
+    POOLINGS = ("mean", "max", "diff", "linear", "conv", "concat", "keep")
+
+    def __init__(
+        self,
+        channel_list: list[int],
+        n_timestamps: int | None = None,
+        pooling: str = "mean",
+        dim: int = 1,
+        subset_lengths: list[int] | None = None,
+    ) -> None:
         super().__init__(channel_list)
-        if pooling not in ("mean", "linear", "conv"):
-            msg = f"pooling must be 'mean', 'linear' or 'conv', got {pooling!r}"
+        if pooling not in self.POOLINGS:
+            msg = f"Unsupported pooling '{pooling}', choose from {list(self.POOLINGS)}."
             raise ValueError(msg)
-        if any(c % n_timestamps for c in channel_list):
-            msg = f"channel_list={channel_list} is not divisible by n_timestamps={n_timestamps}"
-            raise ValueError(msg)
+        if subset_lengths is not None:
+            if pooling == "diff" and len(subset_lengths) != 2:
+                msg = (
+                    f"`diff` pooling requires exactly two subsets in `subset_lengths`, "
+                    f"but got {len(subset_lengths)}: {subset_lengths}"
+                )
+                raise ValueError(msg)
+            if n_timestamps is not None and sum(subset_lengths) != n_timestamps:
+                msg = (
+                    f"The sum of `subset_lengths` must equal `n_timestamps` "
+                    f"(got sum={sum(subset_lengths)}, n_timestamps={n_timestamps})."
+                )
+                raise ValueError(msg)
         self.n_timestamps = n_timestamps
         self.pooling = pooling
-        if pooling == "linear":
-            self.tmap = nn.ModuleList([nn.Linear(n_timestamps, 1) for _ in channel_list])
-        elif pooling == "conv":
-            self.tmap = nn.ModuleList([nn.Conv2d(c, c // n_timestamps, 1) for c in channel_list])
+        self.dim = dim
+        self.subset_lengths = subset_lengths
+
+        if (
+            n_timestamps is not None
+            and pooling not in ("concat", "keep")
+            and any(c % n_timestamps for c in channel_list)
+        ):
+            msg = f"channel_list={channel_list} is not divisible by n_timestamps={n_timestamps}"
+            raise ValueError(msg)
+        if pooling in ("linear", "conv"):
+            if n_timestamps is None:
+                msg = f"'{pooling}' pooling needs n_timestamps"
+                raise ValueError(msg)
+            n = len(subset_lengths) if subset_lengths else n_timestamps
+            if pooling == "linear":
+                self.tmap = nn.ModuleList([nn.Linear(n, 1) for _ in channel_list])
+            else:
+                if dim != 1:
+                    msg = f"'conv' pooling needs dim=1, got dim={dim}"
+                    raise ValueError(msg)
+                self.tmap = nn.ModuleList(
+                    [nn.Conv2d(n * (c // n_timestamps), c // n_timestamps, 1) for c in channel_list]
+                )
+
+    def pool(self, x: torch.Tensor, level: int = 0, dim: int = 1) -> torch.Tensor:
+        """Pool stacked features with the time steps at ``dim`` and the channels at ``dim + 1``."""
+        if self.subset_lengths is not None:
+            if sum(self.subset_lengths) != x.shape[dim]:
+                msg = f"Sum of `subset_lengths` ({sum(self.subset_lengths)}) must equal timesteps ({x.shape[dim]})."
+                raise ValueError(msg)
+            x = torch.stack([subset.mean(dim=dim) for subset in x.split(self.subset_lengths, dim=dim)], dim=dim)
+        if self.pooling == "keep":
+            return x
+        if self.pooling in ("concat", "conv"):
+            x = x.flatten(dim, dim + 1)
+            return self.tmap[level](x) if self.pooling == "conv" else x
+        if self.pooling == "mean":
+            return x.mean(dim=dim)
+        if self.pooling == "max":
+            return x.max(dim=dim).values
+        if self.pooling == "diff":
+            if x.shape[dim] != 2:
+                msg = (
+                    f"`diff` pooling requires exactly two temporal elements "
+                    f"(from input or after subset aggregation), got {x.shape[dim]}. "
+                    f"Consider to use `subset_lengths` to define two subsets."
+                )
+                raise ValueError(msg)
+            return x.select(dim, 0) - x.select(dim, 1)
+        return self.tmap[level](x.movedim(dim, -1)).squeeze(-1)  # linear
 
     def forward(self, features: list[torch.Tensor], **kwargs) -> list[torch.Tensor]:
+        if self.pooling in ("concat", "keep"):
+            return features
         out = []
-        if self.pooling == "conv":
-            return [conv(x) for conv, x in zip(self.tmap, features, strict=True)]
         for i, x in enumerate(features):
-            x = rearrange(x, "b (t c) h w -> b c h w t", t=self.n_timestamps)
-            out.append(x.mean(dim=-1) if self.pooling == "mean" else self.tmap[i](x).squeeze(-1))
+            dim = self.dim % x.dim()
+            out.append(self.pool(x.unflatten(dim, (self.n_timestamps, -1)), level=i, dim=dim))
         return out
 
     def process_channel_list(self, channel_list: list[int]) -> list[int]:
+        if self.pooling in ("concat", "keep"):
+            return channel_list
         return [c // self.n_timestamps for c in channel_list]
 
 
