@@ -1,0 +1,12 @@
+{
+  "scanSettings": {
+    "configMode": "AUTO",
+    "baseBranches": ["main"]
+  },
+  "checkRunSettings": {
+    "vulnerableCheckRunConclusionLevel": "failure"
+  },
+  "issueSettings": {
+    "minSeverityLevel": "LOW"
+  }
+}
