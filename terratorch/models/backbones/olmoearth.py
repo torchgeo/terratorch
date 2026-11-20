@@ -320,7 +320,9 @@ class OlmoEarthBackbone(nn.Module):
         channels *= len(self.band_split) if self.modality_pooling == "concat" else 1
         return [channels] * (len(self.out_indices) if self.out_indices else 1)
 
-    def forward(self, x: Tensor | dict[str, Tensor], timestamps: Tensor | None = None, **kwargs) -> list[Tensor]:
+    def forward(
+        self, x: Tensor | dict[str, Tensor], timestamps: Tensor | None = None, **kwargs: object
+    ) -> list[Tensor]:
         """Forward pass through the OlmoEarth encoder.
 
         Args:
