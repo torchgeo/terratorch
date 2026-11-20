@@ -84,3 +84,24 @@ def test_temporal_wrapper_learned_pooling_matches_neck(pooling):
     assert wrapped.out_channels == [C]
     x = torch.randn(B, 3, T, H, H)
     assert torch.allclose(wrapped(x)[0], neck(concat(x))[0], atol=1e-6)
+
+
+def test_freeze_backbone_keeps_temporal_pooling_trainable():
+    from terratorch.models import EncoderDecoderFactory
+
+    model = EncoderDecoderFactory().build_model(
+        task="segmentation",
+        backbone="terramind_v1_tiny",
+        backbone_pretrained=False,
+        backbone_modalities=["S2L2A"],
+        backbone_use_temporal=True,
+        backbone_temporal_pooling="linear",
+        backbone_temporal_n_timestamps=T,
+        necks=[{"name": "ReshapeTokensToImage"}],
+        decoder="FCNDecoder",
+        num_classes=2,
+    )
+    model.freeze_encoder()
+    wrapper = model.encoder
+    assert not any(p.requires_grad for p in wrapper.encoder.parameters())
+    assert all(p.requires_grad for p in wrapper.temporal_pooling.parameters())

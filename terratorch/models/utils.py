@@ -188,7 +188,8 @@ class TemporalWrapper(nn.Module):
 
         Args:
             encoder (nn.Module): The feature extractor (backbone).
-            pooling (str): Type of pooling ('keep', 'concat', 'mean', 'max', 'diff', 'linear', 'conv'), see\n                ``terratorch.models.necks.TemporalPooling``. 'diff' requires exactly two temporal elements after optional\n                subset aggregation; 'linear' and 'conv' are learned and need ``n_timestamps``.
+            pooling (str): Type of pooling ('keep', 'concat', 'mean', 'max', 'diff', 'linear', 'conv'), see\n                ``terratorch.models.necks.TemporalPooling``. 'diff' requires exactly two temporal elements after optional\n                subset aggregation; 'linear' and 'conv' are learned and need ``n_timestamps``;
+                they stay trainable with ``freeze_backbone`` (see ``freeze``).
             concat (bool): Deprecated - 'concat' now integrated as pooling option.
             n_timestamps (int): Used to compute backbone out_channels when constructing encoder–decoder pipelines in case of 'concat' pooling.
             features_permute_op (list): Permutation operation to perform on the features before aggregation.
@@ -247,6 +248,14 @@ class TemporalWrapper(nn.Module):
                     self.out_channels = [c * n_timestamps for c in encoder.out_channels]
             else:
                 self.out_channels = encoder.out_channels
+
+    def freeze(self) -> None:
+        """Freeze the wrapped encoder only. The learned temporal pooling ('linear', 'conv') stays trainable,
+        like a neck, so ``freeze_backbone`` trains it on top of a frozen encoder."""
+        if hasattr(self.encoder, "freeze"):
+            self.encoder.freeze()
+        else:
+            self.encoder.requires_grad_(False)
 
     def pool_temporal(self, stacked: torch.Tensor, level: int = 0) -> torch.Tensor:
         """Pool per-timestep outputs [B, T, C, ...] over T, see ``TemporalPooling``."""
