@@ -10,18 +10,33 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
 
 ## Usage
 
-```yaml
-model_args:
-  backbone: galileo_tiny
-  backbone_pretrained: True
-  backbone_patch_size: 8
-  backbone_bands: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B11, B12, VV, VH, elevation]
-  backbone_out_indices: [2, 5, 8, 11]  # for hierarchical decoders
-  necks:
-    - name: LearnedInterpolateToPyramidal
-  decoder: UNetDecoder
-  ...
-```
+=== "YAML"
+    ```yaml
+    model_args:
+      backbone: galileo_tiny
+      backbone_pretrained: True
+      backbone_patch_size: 8
+      backbone_bands: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B11, B12, VV, VH, elevation]
+      backbone_out_indices: [2, 5, 8, 11]  # for hierarchical decoders
+      necks:
+        - name: LearnedInterpolateToPyramidal
+      decoder: UNetDecoder
+      ...
+    ```
+
+=== "Python"
+    ```python
+    model_args = {
+        "backbone": "galileo_tiny",
+        "backbone_pretrained": True,
+        "backbone_patch_size": 8,
+        "backbone_bands": ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B9", "B11", "B12", "VV", "VH", "elevation"],
+        "backbone_out_indices": [2, 5, 8, 11],
+        "necks": [{"name": "LearnedInterpolateToPyramidal"}],
+        "decoder": "UNetDecoder",
+        ...
+    }
+    ```
 
 - Input: `[B, C, H, W]` or a time series `[B, C, T, H, W]`. `bands` names the channels with Galileo's band names;
   they are sorted into Galileo's input families (e.g. `elevation` into the space family). Bands without a slot (here
