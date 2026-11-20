@@ -5,7 +5,7 @@
 
 These tests verify that the OlmoEarth backbone can be registered,
 instantiated, and produce the expected output shapes. Tests that require
-the olmoearth-pretrain package are skipped if the package is not installed.
+olmoearth-pretrain (or olmoearth-pretrain-minimal) are skipped if neither is installed.
 """
 
 import gc
@@ -13,17 +13,18 @@ import gc
 import pytest
 import torch
 
-# Check if olmoearth-pretrain is available
+# Check if olmoearth-pretrain (or the lighter olmoearth-pretrain-minimal) is available
 try:
-    import olmoearth_pretrain  # noqa: F401
+    from terratorch.models.backbones.olmoearth import _olmoearth_api
 
+    _olmoearth_api()
     HAS_OLMOEARTH = True
 except ImportError:
     HAS_OLMOEARTH = False
 
 skip_no_olmoearth = pytest.mark.skipif(
     not HAS_OLMOEARTH,
-    reason="olmoearth-pretrain not installed",
+    reason="neither olmoearth-pretrain nor olmoearth-pretrain-minimal installed",
 )
 
 
@@ -148,6 +149,62 @@ class TestOlmoEarthBackbone:
             _create_olmoearth_backbone("olmoearth_v99_mega", pretrained=False)
 
 
+class TestOlmoEarthMultimodalTemporal:
+    """Stacked multi-modal input, time series, temporal pooling and multi-scale outputs."""
+
+    S2 = ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B09", "B11", "B12"]
+
+    @staticmethod
+    def _model(**kwargs):
+        from terratorch.models.backbones.olmoearth import _create_olmoearth_backbone
+
+        return _create_olmoearth_backbone("olmoearth_v1_nano", pretrained=False, patch_size=8, **kwargs).eval()
+
+    @skip_no_olmoearth
+    def test_time_series_mean_and_concat(self):
+        x = torch.randn(1, 12, 3, 32, 32)
+        with torch.no_grad():
+            assert self._model()(x)[0].shape == (1, 128, 4, 4)
+            model = self._model(temporal_pooling="concat", n_timestamps=3)
+            assert model(x)[0].shape == (1, 3 * 128, 4, 4)
+        assert model.out_channels == [3 * 128]
+
+    @skip_no_olmoearth
+    def test_bands_split_matches_dict_input(self):
+        """A stacked S2 + S1 tensor in our channel order equals the native per-modality dict."""
+        from terratorch.models.backbones.olmoearth import _olmoearth_api
+
+        Modality = _olmoearth_api().Modality
+
+        model = self._model(bands={"sentinel2_l2a": self.S2, "sentinel1": ["vv", "vh"]})
+        x = torch.randn(1, 14, 2, 32, 32)
+        order = [self.S2.index(b) for b in Modality.get("sentinel2_l2a").band_order]
+        native = {"sentinel2_l2a": x[:, order], "sentinel1": x[:, 12:]}
+        with torch.no_grad():
+            assert torch.allclose(model(x)[0], model(native)[0])
+
+    @skip_no_olmoearth
+    def test_bands_must_cover_modality(self):
+        with pytest.raises(ValueError, match="permutation"):
+            self._model(bands={"sentinel2_l2a": self.S2[:-1]})
+
+    @skip_no_olmoearth
+    def test_out_indices(self):
+        model = self._model(out_indices=[0, 1, 2, 3])
+        with torch.no_grad():
+            out = model(torch.randn(1, 12, 32, 32))
+        assert [o.shape for o in out] == [(1, 128, 4, 4)] * 4
+        assert model.out_channels == [128] * 4
+        # the last block's output is the encoder output before the final norm, so it must differ from
+        # the first block's, i.e. the hooks capture different layers
+        assert not torch.allclose(out[0], out[3])
+
+    @skip_no_olmoearth
+    def test_concat_rejects_wrong_timestamps(self):
+        with pytest.raises(ValueError, match="time steps"):
+            self._model(temporal_pooling="concat", n_timestamps=4)(torch.randn(1, 12, 2, 32, 32))
+
+
 class TestOlmoEarthImportGuard:
     """Test behavior when olmoearth-pretrain is not installed."""
 
@@ -156,3 +213,22 @@ class TestOlmoEarthImportGuard:
         # This test always passes because __init__.py uses try/except
         # If import failed, the entire test suite would fail to collect
         pass
+
+
+@skip_no_olmoearth
+def test_fast_pass_is_exact_in_training():
+    """fast_pass (default) only drops the all-visible attention mask, so training outputs are unchanged."""
+    from terratorch.models.backbones.olmoearth import _create_olmoearth_backbone
+
+    x = torch.randn(2, 14, 2, 32, 32)
+    bands = {"sentinel2_l2a": TestOlmoEarthMultimodalTemporal.S2, "sentinel1": ["vv", "vh"]}
+    outs = []
+    for fast_pass in (True, False):
+        torch.manual_seed(0)
+        model = _create_olmoearth_backbone(
+            "olmoearth_v1_nano", pretrained=False, patch_size=8, bands=bands, out_indices=[1, 3], fast_pass=fast_pass
+        )
+        model.train()
+        torch.manual_seed(1)  # same drop-path draws
+        outs.append(model(x))
+    assert all(torch.allclose(a, b, atol=1e-5) for a, b in zip(*outs, strict=True))
