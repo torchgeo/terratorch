@@ -13,16 +13,29 @@ Weights are downloaded from [Meta](https://ai.meta.com/resources/models-and-libr
 
 ## Usage
 
-```yaml
-model_args:
-  backbone: dinov3_convnext_tiny
-  backbone_ckpt_path: path/to/dinov3_convnext_tiny_pretrain_lvd1689m.pth
-  backbone_bands: [B2, B3, B4, B8, B11, B12]  # optional, default RGB
-  necks:
-    - name: ReshapeTokensToImage
-  decoder: UNetDecoder
-  ...
-```
+=== "YAML"
+    ```yaml
+    model_args:
+      backbone: dinov3_convnext_tiny
+      backbone_ckpt_path: path/to/dinov3_convnext_tiny_pretrain_lvd1689m.pth
+      backbone_bands: [B2, B3, B4, B8, B11, B12]  # optional, default RGB
+      necks:
+        - name: ReshapeTokensToImage
+      decoder: UNetDecoder
+      ...
+    ```
+
+=== "Python"
+    ```python
+    model_args = {
+        "backbone": "dinov3_convnext_tiny",
+        "backbone_ckpt_path": "path/to/dinov3_convnext_tiny_pretrain_lvd1689m.pth",
+        "backbone_bands": ["B2", "B3", "B4", "B8", "B11", "B12"],  # optional, default RGB
+        "necks": [{"name": "ReshapeTokensToImage"}],
+        "decoder": "UNetDecoder",
+        ...
+    }
+    ```
 
 - `bands`: widens the first layer to `len(bands)` channels. The pretrained RGB weights go to `RED`/`GREEN`/`BLUE`
   (or `B04`/`B03`/`B02`), the other channels are randomly initialized.
