@@ -57,6 +57,51 @@ GALILEO_CONFIGS = {
     "base": {"embedding_size": 768, "depth": 12, "num_heads": 12},
 }
 COMMON_CONFIG = {"mlp_ratio": 4, "max_sequence_length": 24, "max_patch_size": 8, "drop_path": 0.1}
+# Galileo's pre-training statistics (config/normalization.json in nasaharvest/galileo) of the bands it normalizes
+# from mean +- 2 std to [0, 1]: Sentinel-1 in dB, Sentinel-2 digital numbers, SRTM elevation (m) and slope.
+GALILEO_STATS = {
+    "VV": (-11.7287, 4.8871),
+    "VH": (-18.8556, 5.7303),
+    "B2": (1395.3409, 917.7041),
+    "B3": (1338.4027, 913.2988),
+    "B4": (1343.0988, 1092.6787),
+    "B5": (1543.8608, 1047.2206),
+    "B6": (2186.2022, 1048.0102),
+    "B7": (2525.0933, 1143.6903),
+    "B8": (2410.3377, 1098.9792),
+    "B8A": (2750.2855, 1204.4728),
+    "B11": (2234.9111, 1145.9774),
+    "B12": (1474.5311, 980.243),
+    "elevation": (673.0153, 983.0697),
+    "slope": (5.9301, 8.1674),
+}
+
+
+def galileo_normalization(bands: list[str]) -> tuple[list[float], list[float]]:
+    """Means and stds for TerraTorch datamodules that reproduce Galileo's pre-training normalization.
+
+    Galileo maps Sentinel-1 (dB), Sentinel-2 (digital numbers) and SRTM from ``mean ± 2·std`` to [0, 1] with
+    ``GALILEO_STATS``; ``(x - (mean - 2·std)) / (4·std)`` is the same. NDVI and Dynamic World are not normalized,
+    WorldCover is divided by 100. Bands without a slot in Galileo get ``(0, 1)``.
+
+    Args:
+        bands: The backbone's ``bands``, in input channel order.
+
+    Returns:
+        ``(means, stds)``, one value per input channel.
+    """
+    stats = {k.lower(): v for k, v in GALILEO_STATS.items()}
+    means, stds = [], []
+    for band in bands:
+        name = str(getattr(band, "value", band)).lower()
+        mean, std = stats[name] if name in stats else (None, None)
+        if mean is not None:
+            means.append(mean - 2 * std)
+            stds.append(4 * std)
+        else:
+            means.append(0.0)
+            stds.append(100.0 if name.startswith("wc_") else 1.0)
+    return means, stds
 
 
 class GalileoBackbone(nn.Module):
@@ -85,6 +130,9 @@ class GalileoBackbone(nn.Module):
         n_timestamps: Number of time steps, required for "concat".
         out_indices: Encoder blocks whose outputs are returned, for multi-scale decoders.
             Defaults to the final encoder output only.
+        compute_ndvi: If ``bands`` has B4 and B8 but no NDVI, compute NDVI from them, as Galileo always saw it in
+            pre-training. Assumes inputs normalized as in ``galileo_normalization``; negative reflectances are
+            clamped to 0.
     """
 
     def __init__(
@@ -95,6 +143,7 @@ class GalileoBackbone(nn.Module):
         temporal_pooling: str = "mean",
         n_timestamps: int = 1,
         out_indices: list[int] | None = None,
+        compute_ndvi: bool = True,
     ) -> None:
         super().__init__()
         if temporal_pooling not in ("mean", "concat"):
@@ -119,6 +168,11 @@ class GalileoBackbone(nn.Module):
             ignored = [b for b, n in zip(bands, names, strict=True) if n not in space_time + space]
             if ignored:
                 warnings.warn(f"Galileo has no slot for bands {ignored}, they are ignored.", stacklevel=2)
+            # NDVI from B4 and B8 if not given (Galileo always saw it in pre-training)
+            self.ndvi_sources = None
+            if compute_ndvi and "ndvi" not in names and {"b4", "b8"} <= set(names):
+                self.ndvi_sources = (names.index("b4"), names.index("b8"))
+                self.band_split["space_time"].append((space_time.index("ndvi"), -1))
             # groups with no given band are masked, i.e. treated as absent
             self.masked_groups = {
                 family: [
@@ -146,11 +200,12 @@ class GalileoBackbone(nn.Module):
         channels = self.embed_dim * (self.n_timestamps if self.temporal_pooling == "concat" else 1)
         return [channels] * (len(self.out_indices) if self.out_indices else 1)
 
-    def forward(self, x: Tensor | dict[str, Tensor], months: Tensor | None = None) -> list[Tensor]:
+    def forward(self, x: Tensor | dict[str, Tensor], months: Tensor | None = None, **kwargs) -> list[Tensor]:
         """
         Args:
             x: Tensor (B, C, H, W) or (B, C, T, H, W), or a dict of Galileo families (see class docs).
             months: Optional (B, T) zero-indexed acquisition months. Defaults to 0.
+            **kwargs: Other batch entries passed on by TerraTorch tasks, ignored.
 
         Returns:
             List of feature maps (B, out_channels, H / patch_size, W / patch_size), one per output level.
@@ -170,7 +225,12 @@ class GalileoBackbone(nn.Module):
         if self.band_split is not None:
             s_t_x = x.new_zeros(B, len(SPACE_TIME_BANDS), T, H, W)
             for target, source in self.band_split["space_time"]:
-                s_t_x[:, target] = x[:, source]
+                if source >= 0:
+                    s_t_x[:, target] = x[:, source]
+            if self.ndvi_sources is not None:
+                s_t_x[:, SPACE_TIME_BANDS.index("NDVI")] = self._ndvi(
+                    x[:, self.ndvi_sources[0]], x[:, self.ndvi_sources[1]]
+                )
             s_t_m[..., self.masked_groups["space_time"]] = 1
             from_bands = bool(self.band_split["space"]) and space is None
             if from_bands:
@@ -225,6 +285,14 @@ class GalileoBackbone(nn.Module):
             for block in captured
         ]
 
+    @staticmethod
+    def _ndvi(b4: Tensor, b8: Tensor) -> Tensor:
+        """NDVI from B4 and B8 normalized as in Galileo (``galileo_normalization``), on clamped reflectances."""
+        (m4, s4), (m8, s8) = GALILEO_STATS["B4"], GALILEO_STATS["B8"]
+        red = (b4 * 4 * s4 + m4 - 2 * s4).clamp(min=0)  # undo the normalization; negative reflectances -> 0
+        nir = (b8 * 4 * s8 + m8 - 2 * s8).clamp(min=0)
+        return ((nir - red) / (nir + red).clamp(min=1e-6)).clamp(-1, 1)
+
     def _to_feature_map(self, tokens: Tensor) -> Tensor:
         """(B, H', W', T, band_groups, D) -> (B, out_channels, H', W')."""
         tokens = tokens.mean(dim=4)  # average band groups -> (B, H', W', T, D)
@@ -246,7 +314,7 @@ def _create_galileo_backbone(size: str, pretrained: bool = False, **kwargs) -> G
         encoder = Encoder.load_from_folder(Path(files[0]).parent, device=torch.device("cpu"))
     else:
         encoder = Encoder(**COMMON_CONFIG, **GALILEO_CONFIGS[size])
-    wrapper_args = ("patch_size", "bands", "temporal_pooling", "n_timestamps", "out_indices")
+    wrapper_args = ("patch_size", "bands", "temporal_pooling", "n_timestamps", "out_indices", "compute_ndvi")
     return GalileoBackbone(encoder, **{k: v for k, v in kwargs.items() if k in wrapper_args})
 
 

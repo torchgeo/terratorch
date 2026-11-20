@@ -5,7 +5,12 @@ import gc
 import pytest
 import torch
 
-from terratorch.models.backbones.galileo import GalileoBackbone, _create_galileo_backbone
+from terratorch.models.backbones.galileo import (
+    GALILEO_STATS,
+    GalileoBackbone,
+    _create_galileo_backbone,
+    galileo_normalization,
+)
 from terratorch.models.backbones.galileo import SPACE_BANDS, SPACE_TIME_BANDS
 from terratorch.registry import BACKBONE_REGISTRY
 
@@ -34,8 +39,8 @@ def test_space_time_input_and_temporal_pooling():
 
 def test_bands_split():
     with pytest.warns(UserWarning, match="B1"):
-        model = nano(bands=S2_S1_DEM)
-    # NDVI is not given, so its group is masked; of the space family only SRTM is given
+        model = nano(bands=S2_S1_DEM, compute_ndvi=False)
+    # NDVI is neither given nor computed, so its group is masked; of the space family only SRTM is given
     assert model.masked_groups == {"space_time": [6], "space": [1, 2]}
     x = torch.zeros(1, len(S2_S1_DEM), 2, 32, 32)
     x[:, -1] = 5.0
@@ -73,3 +78,25 @@ def test_errors():
         nano()(torch.randn(1, 12, 32, 32))
     with pytest.raises(ValueError, match="time steps"):
         nano(temporal_pooling="concat", n_timestamps=4)(torch.randn(1, len(SPACE_TIME_BANDS), 2, 32, 32))
+
+
+def test_ndvi_from_b4_b8():
+    with pytest.warns(UserWarning):
+        model = nano(bands=S2_S1_DEM)
+    assert model.masked_groups["space_time"] == []  # NDVI is computed, so not masked
+    means, stds = galileo_normalization(S2_S1_DEM)
+    raw = torch.rand(1, len(S2_S1_DEM), 1, 8, 8) * 3000
+    raw[:, S2_S1_DEM.index("B4"), 0, 0, 0] = -2007  # negative reflectance, as in PASTIS
+    x = (raw - torch.tensor(means)[:, None, None, None]) / torch.tensor(stds)[:, None, None, None]
+    red, nir = raw[:, S2_S1_DEM.index("B4")].clamp(min=0), raw[:, S2_S1_DEM.index("B8")]
+    ndvi = model._ndvi(x[:, S2_S1_DEM.index("B4")], x[:, S2_S1_DEM.index("B8")])
+    assert torch.isfinite(ndvi).all() and ndvi.abs().max() <= 1
+    assert torch.allclose(ndvi, (nir - red) / (nir + red), atol=1e-4)
+
+
+def test_galileo_normalization():
+    means, stds = galileo_normalization(["VV", "B4", "NDVI", "DW_water", "WC_maize", "B1"])
+    mean, std = GALILEO_STATS["VV"]
+    assert means[:2] == [mean - 2 * std, GALILEO_STATS["B4"][0] - 2 * GALILEO_STATS["B4"][1]]
+    assert stds[0] == 4 * std
+    assert (means[2:], stds[2:]) == ([0.0] * 4, [1.0, 1.0, 100.0, 1.0])

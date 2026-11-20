@@ -40,24 +40,34 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
 
 - Input: `[B, C, H, W]` or a time series `[B, C, T, H, W]`. `bands` names the channels with Galileo's band names;
   they are sorted into Galileo's input families (e.g. `elevation` into the space family). Bands without a slot (here
-  `B1`, `B9`) are ignored, missing band groups are masked. Without `bands`, the input holds Galileo's 13 space-time
-  bands in order.
+  `B1`, `B9`) are ignored, missing band groups are masked. With `B4` and `B8`, NDVI is computed
+  (`compute_ndvi`, default `True`). Without `bands`, the input holds Galileo's 13 space-time bands in order.
 - Output: feature maps `[B, D, H / patch_size, W / patch_size]`, averaged over band groups.
 - `temporal_pooling`: `mean` (default) or `concat` (time stacked into channels, needs `n_timestamps`).
-- `months` (`[B, T]`, zero-indexed) can be passed to the forward call; defaults to 0.
 - Do not use `backbone_use_temporal`: Galileo encodes the time series itself.
 
 ## Tips
 
-- **Normalization**: Galileo was pre-trained on raw values (Sentinel-2 digital numbers, Sentinel-1 in dB, elevation
-  in meters), mapped from `mean ± 2·std` to `[0, 1]` with the statistics in Galileo's
-  [`config/normalization.json`](https://github.com/nasaharvest/galileo/blob/main/config/normalization.json). To
-  reproduce this with the TerraTorch datamodules, set `means` to `mean - 2·std` and `stds` to `4·std`.
+- **Normalization**: Galileo expects raw values (Sentinel-2 digital numbers, Sentinel-1 in dB, elevation in meters)
+  mapped from `mean ± 2·std` to `[0, 1]` with its pre-training statistics
+  ([`config/normalization.json`](https://github.com/nasaharvest/galileo/blob/main/config/normalization.json)). Inputs
+  standardized with dataset statistics look plausible but do not match. Get datamodule `means` and `stds` that
+  reproduce it:
+
+    ```python
+    from terratorch.models.backbones.galileo import galileo_normalization
+
+    means, stds = galileo_normalization(["B2", "B3", "B4", "B8", "VV", "VH", "elevation"])
+    ```
+
+- **NDVI**: computed from `B4` and `B8` after undoing this normalization, with negative reflectances clamped to 0, so
+  it requires inputs normalized as above. Otherwise, set `compute_ndvi: False` or pass an `NDVI` channel (not
+  normalized).
+- **Dates**: months default to 0. Pass them as `months` `[B, T]` (0 to 11): add a `months` entry to the batch
+  (TerraTorch tasks pass extra batch entries to the backbone) or to a dict input.
 - **Memory**: each band group is a separate token, so the encoder attends over about
   `(H / patch_size)² · (7 · T + 3)` tokens. At 256 px, `patch_size: 16` keeps this manageable; smaller patch sizes
   quadruple the tokens per halving.
-- **NDVI**: Galileo has an NDVI band. Add it as an input channel named `NDVI`, `(B8 - B4) / (B8 + B4)`, left
-  unnormalized (mean 0, std 1), as in Galileo; otherwise its band group is masked.
 - **Time series**: with `temporal_pooling: concat`, a learned temporal pooling neck (`TemporalPooling`) can weight the
   time steps instead of averaging them.
 - **Frozen encoder**: works with `freeze_backbone: True`.
