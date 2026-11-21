@@ -51,6 +51,10 @@
     options:
         toc_label: "Surya"
 
+:::terratorch.models.backbones.universat
+    options:
+        toc_label: "UniverSat"
+
 <!--
 ### Timm
 
