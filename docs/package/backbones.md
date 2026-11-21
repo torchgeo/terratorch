@@ -30,6 +30,27 @@
     options:
         toc_label: "Clay v1"
 
+:::terratorch.models.backbones.gfm_swin.gfm_swin_base
+    options:
+        toc_label: "GFM Swin"
+
+!!! tip
+    `gfm_swin_base` returns NCHW features, so unlike the other Swin backbones it needs no
+    `PermuteDims` neck to feed decoders such as `UperNetDecoder`:
+
+    ```yaml
+    model:
+      init_args:
+        model_args:
+          backbone: gfm_swin_base
+          backbone_pretrained: true
+          backbone_model_bands:
+            - RED
+            - GREEN
+            - BLUE
+          decoder: UperNetDecoder
+    ```
+
 ## APIs for External Models
 
 !!! tip
