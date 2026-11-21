@@ -23,7 +23,6 @@ Other commonly used factories are the `ObjectDetectionModelFactory` for object d
 
 :::terratorch.models.generic_unet_model_factory.GenericUnetModelFactory
 
-:::terratorch.models.satmae_model_factory.SatMAEModelFactory
 
 Base factory: 
 

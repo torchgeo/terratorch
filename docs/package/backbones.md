@@ -26,6 +26,10 @@
     options:
         toc_label: "DOFA"
 
+:::terratorch.models.backbones.satmae.SatMAEEncoder
+    options:
+        toc_label: "SatMAE"
+
 :::terratorch.models.backbones.clay_v1.embedder
     options:
         toc_label: "Clay v1"
