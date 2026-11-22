@@ -8,7 +8,10 @@ import numpy as np
 import pandas as pd
 import torch
 from lightning.pytorch.callbacks import Callback
-from torchgeo.tasks import BaseTask
+try:
+    from torchgeo.trainers import BaseTask
+except ImportError:
+    from torchgeo.tasks import BaseTask
 
 from terratorch.datasets import unbind_samples
 from terratorch.models.model import Model, ModelOutput

@@ -37,7 +37,11 @@ from matplotlib import patches
 from matplotlib.figure import Figure
 from torch import Tensor, nn
 from torch.utils.data import default_collate
-from torchgeo.datasets.utils import lazy_import, quantile_normalization
+from torchgeo.datasets.utils import lazy_import
+try:
+    from torchgeo.datasets.utils import quantile_normalization
+except ImportError:
+    from torchgeo.datasets.utils import percentile_normalization as quantile_normalization
 
 from terratorch.datasets.transforms import kornia_augmentations_to_callable_with_dict
 
