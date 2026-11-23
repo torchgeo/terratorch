@@ -100,3 +100,19 @@ def test_galileo_normalization():
     assert means[:2] == [mean - 2 * std, GALILEO_STATS["B4"][0] - 2 * GALILEO_STATS["B4"][1]]
     assert stds[0] == 4 * std
     assert (means[2:], stds[2:]) == ([0.0] * 4, [1.0, 1.0, 100.0, 1.0])
+
+
+def test_masked_band_groups_not_averaged():
+    """Only observed band groups enter the feature map; masked ones come back as identical filler tokens."""
+    model = BACKBONE_REGISTRY.build(
+        "galileo_tiny", pretrained=False, patch_size=8, bands=["VV", "VH"], temporal_pooling="concat", n_timestamps=2
+    ).eval()
+    captured = {}
+    model.encoder.register_forward_hook(lambda module, inputs, output: captured.update(out=output))
+    with torch.no_grad():
+        features = model(torch.randn(1, 2, 2, 32, 32))[-1]
+    tokens, mask = captured["out"][0], captured["out"][4]
+    observed = mask[0, 0, 0, 0] == 0
+    assert 0 < observed.sum() < observed.numel()
+    expected = tokens[..., observed, :].mean(dim=4).flatten(start_dim=3).permute(0, 3, 1, 2)
+    torch.testing.assert_close(features, expected)

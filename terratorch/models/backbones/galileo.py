@@ -265,7 +265,7 @@ class GalileoBackbone(nn.Module):
         )
         # out[0]: space-time tokens (B, H', W', T, band_groups, D)
         if not self.out_indices:
-            return [self._to_feature_map(out[0])]
+            return [self._to_feature_map(out[0], out[4])]
 
         # Block outputs are the pruned token sequence: the encoder drops masked tokens with a stable
         # sort before the blocks and restores them after the last one. Undo the same sort to put each
@@ -280,7 +280,8 @@ class GalileoBackbone(nn.Module):
             self._to_feature_map(
                 torch.zeros(B, masks.shape[1], self.embed_dim, dtype=block.dtype, device=device)
                 .scatter(1, order[:, : block.shape[1], None].expand_as(block), block)[:, :n_space_time]
-                .reshape(B, *grid, self.embed_dim)
+                .reshape(B, *grid, self.embed_dim),
+                out[4],
             )
             for block in captured
         ]
@@ -293,9 +294,13 @@ class GalileoBackbone(nn.Module):
         nir = (b8 * 4 * s8 + m8 - 2 * s8).clamp(min=0)
         return ((nir - red) / (nir + red).clamp(min=1e-6)).clamp(-1, 1)
 
-    def _to_feature_map(self, tokens: Tensor) -> Tensor:
-        """(B, H', W', T, band_groups, D) -> (B, out_channels, H', W')."""
-        tokens = tokens.mean(dim=4)  # average band groups -> (B, H', W', T, D)
+    def _to_feature_map(self, tokens: Tensor, mask: Tensor) -> Tensor:
+        """(B, H', W', T, band_groups, D) -> (B, out_channels, H', W').
+
+        Band groups are averaged over the observed ones only (mask 0), as Galileo's own pooling does: masked groups
+        come back from the encoder as identical filler tokens and would add a constant to every feature."""
+        keep = (mask == 0).unsqueeze(-1).to(tokens.dtype)  # (B, H', W', T, band_groups, 1)
+        tokens = (tokens * keep).sum(dim=4) / keep.sum(dim=4).clamp(min=1)  # -> (B, H', W', T, D)
         if self.temporal_pooling == "mean":
             tokens = tokens.mean(dim=3)
         else:
