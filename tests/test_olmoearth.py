@@ -48,6 +48,7 @@ class TestOlmoEarthRegistration:
             "olmoearth_v1_2_tiny",
             "olmoearth_v1_2_small",
             "olmoearth_v1_2_base",
+            "olmoearth_v1_3_base",
         ]
 
         for model_name in expected_models:

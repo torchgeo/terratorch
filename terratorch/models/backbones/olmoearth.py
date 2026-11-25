@@ -78,6 +78,10 @@ OLMOEARTH_CONFIGS: dict[str, dict] = {
         "model_id": "OlmoEarth-v1_2-Base",
         "embed_dim": 768,
     },
+    "olmoearth_v1_3_base": {  # olmoearth-pretrain-minimal >= 0.1.5
+        "model_id": "OlmoEarth-v1_3-Base",
+        "embed_dim": 768,
+    },
 }
 
 
@@ -547,3 +551,9 @@ def olmoearth_v1_2_small(pretrained: bool = False, **kwargs) -> OlmoEarthBackbon
 def olmoearth_v1_2_base(pretrained: bool = False, **kwargs) -> OlmoEarthBackbone:
     """OlmoEarth v1.2 Base (114M encoder params)."""
     return _create_olmoearth_backbone("olmoearth_v1_2_base", pretrained=pretrained, **kwargs)
+
+
+@TERRATORCH_BACKBONE_REGISTRY.register
+def olmoearth_v1_3_base(pretrained: bool = False, **kwargs) -> OlmoEarthBackbone:
+    """OlmoEarth v1.3 Base (needs olmoearth-pretrain-minimal >= 0.1.5)."""
+    return _create_olmoearth_backbone("olmoearth_v1_3_base", pretrained=pretrained, **kwargs)

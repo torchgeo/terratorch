@@ -11,6 +11,7 @@ the lighter `olmoearth-pretrain-minimal`; both work.
 | `olmoearth_v1_*` | `nano`, `tiny`, `base`, `large` |
 | `olmoearth_v1_1_*` | `nano`, `tiny`, `base` |
 | `olmoearth_v1_2_*` | `nano`, `tiny`, `small`, `base` |
+| `olmoearth_v1_3_*` | `base` (`olmoearth-pretrain-minimal` >= 0.1.5) |
 
 `pretrained=True` downloads the weights from Hugging Face (default `False`). OlmoEarth encodes `sentinel2_l2a`,
 `sentinel1` and `landsat` time series.
