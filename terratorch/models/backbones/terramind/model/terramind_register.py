@@ -514,6 +514,12 @@ def build_terrammind_vit(
     pretrained_bands: dict[str, list] | None = None,
     **kwargs,
 ):
+    if pretrained and kwargs.get("patch_size", 16) != 16:
+        msg = (
+            f"Pre-trained TerraMind uses 16x16 patch embeddings, got patch_size={kwargs['patch_size']}. "
+            f"Use backbone_patch_resize: {kwargs['patch_size']} to resize the input instead."
+        )
+        raise ValueError(msg)
 
     model = TerraMindViT(pretrained=pretrained, **kwargs)
 
