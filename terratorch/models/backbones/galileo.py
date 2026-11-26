@@ -184,6 +184,9 @@ class GalileoBackbone(nn.Module):
         self.out_indices = None
         if out_indices:
             depth = len(encoder.blocks)
+            if any(i < -depth or i >= depth for i in out_indices):
+                msg = f"out_indices must be between {-depth} and {depth - 1}, got {out_indices}"
+                raise ValueError(msg)
             self.out_indices = [i % depth for i in out_indices]
             self._captured: dict[int, Tensor] = {}
             for i in set(self.out_indices):
