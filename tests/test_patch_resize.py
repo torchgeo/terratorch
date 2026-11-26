@@ -79,9 +79,12 @@ def test_native_patch_size_resolution(monkeypatch):
         return model
 
     monkeypatch.setattr("terratorch.models.utils.BACKBONE_REGISTRY.build", build)
-    with pytest.warns(UserWarning, match="assuming 16"):
+    with pytest.warns(UserWarning, match="native patch size 16"):
         assert _get_backbone("x", patch_resize=8).scale == 2
-    assert _get_backbone("x", patch_resize=4, with_embed=True).scale == 2  # inferred native 8
+    with pytest.warns(UserWarning, match="native patch size 8"):
+        assert _get_backbone("x", patch_resize=4, with_embed=True).scale == 2  # inferred native 8
+    assert _get_backbone("x", patch_resize=4, with_embed=True, patch_size=16).scale == 4  # kwarg wins
+    assert seen.pop("patch_size") == 16
     model = _get_backbone("x", patch_resize=4, patch_resize_native=32)
     assert model.scale == 8 and "patch_size" not in seen and "patch_resize_native" not in seen
 

@@ -154,7 +154,8 @@ def _get_backbone(backbone: str | nn.Module, **backbone_kwargs) -> nn.Module:
     features_permute_op = backbone_kwargs.pop("temporal_features_permute_op", None)
     subset_lengths = backbone_kwargs.pop("temporal_subset_lengths", None)
     patch_resize = backbone_kwargs.pop("patch_resize", None)
-    patch_resize_native = backbone_kwargs.pop("patch_resize_native", None)
+    # native patch size: patch_resize_native (not passed to the model), else patch_size (passed on), else inferred
+    patch_resize_native = backbone_kwargs.pop("patch_resize_native", None) or backbone_kwargs.get("patch_size")
     patch_resize_interpolation = backbone_kwargs.pop("patch_resize_interpolation", "bilinear")
 
     if isinstance(backbone, nn.Module):
@@ -166,15 +167,14 @@ def _get_backbone(backbone: str | nn.Module, **backbone_kwargs) -> nn.Module:
     if patch_resize is not None:
         if patch_resize_native is None:
             # same inference as EncoderDecoderFactory: first module exposing a patch size
-            patch_resize_native = next((m.patch_size for m in model.modules() if hasattr(m, "patch_size")), None)
-            if patch_resize_native is None:
-                warnings.warn(
-                    "Native patch size not found on the backbone, assuming 16. Set backbone_patch_resize_native.",
-                    stacklevel=2,
-                )
-                patch_resize_native = 16
-            elif not isinstance(patch_resize_native, int):
+            patch_resize_native = next((m.patch_size for m in model.modules() if hasattr(m, "patch_size")), 16)
+            if not isinstance(patch_resize_native, int):
                 patch_resize_native = patch_resize_native[-1]  # (16, 16) or Prithvi's [1, 16, 16]
+            warnings.warn(
+                f"backbone_patch_size not set, using native patch size {patch_resize_native} for patch_resize "
+                "(first backbone module with a patch_size, else 16). Set backbone_patch_size to silence this.",
+                stacklevel=2,
+            )
         model = PatchResize(model, patch_resize, patch_resize_native, patch_resize_interpolation)
 
     # Apply TemporalWrapper inside _get_backbone
@@ -204,8 +204,9 @@ class PatchResize(nn.Module):
 
     Only the backbone input is resized; labels keep their resolution and the decoder upsamples to it
     as usual. Set it from a model config with ``backbone_patch_resize: 8``. The native patch size is
-    ``backbone_patch_resize_native`` if given (not passed to the backbone), else the ``patch_size`` of the
-    first backbone module that has one (as in ``EncoderDecoderFactory``), else 16 with a warning.
+    ``backbone_patch_resize_native`` if given (not passed to the backbone), else ``backbone_patch_size``
+    (also passed to the backbone, as usual), else the ``patch_size`` of the first backbone module that has
+    one (as in ``EncoderDecoderFactory``), else 16. The last two warn.
 
     Args:
         encoder: The wrapped backbone. Its ``out_channels`` are passed through.

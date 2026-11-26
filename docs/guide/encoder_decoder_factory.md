@@ -79,9 +79,9 @@ backbone: terramind_v1_base
 backbone_patch_resize: 8            # 256 px input -> 512 px -> 32 x 32 tokens
 ```
 
-The native patch size is taken from `backbone_patch_resize_native`, else from the `patch_size` of the first
-encoder module that has one (as the factory does for padding: 16 for TerraMind and Prithvi, the requested
-tokenization size for OlmoEarth and Galileo), else 16 with a warning.
+The native patch size is taken from `backbone_patch_resize_native`, else from `backbone_patch_size`
+(which is also passed to the encoder, as usual). If neither is set, it is inferred with a warning from the
+`patch_size` of the first encoder module that has one, as the factory does for padding, else 16.
 
 ## Necks
 
