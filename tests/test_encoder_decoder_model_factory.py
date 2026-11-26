@@ -111,6 +111,26 @@ def test_create_classification_model_no_in_channels(backbone, model_factory: Enc
     gc.collect()
 
 
+def test_linear_decoder_segmentation():
+    class TinyBackbone(torch.nn.Module):
+        out_channels = [8]
+
+        def forward(self, x):
+            return [x]
+
+    model = EncoderDecoderFactory().build_model(
+        task="segmentation",
+        backbone=TinyBackbone(),
+        decoder="LinearDecoder",
+        decoder_upsampling_size=1,
+        num_classes=2,
+    )
+
+    assert isinstance(model.head, torch.nn.Identity)
+    with torch.no_grad():
+        assert model(torch.ones(1, 8, 4, 4)).output.shape == (1, 2, 4, 4)
+
+
 @pytest.mark.parametrize("backbone", ["prithvi_eo_v2_100_tl"])
 @pytest.mark.parametrize("task,expected", PIXELWISE_TASK_EXPECTED_OUTPUT)
 @pytest.mark.parametrize("decoder", ["UNetDecoder"])
