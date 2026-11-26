@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn.functional as F
 from torch import Tensor
@@ -7,12 +9,25 @@ from torchmetrics import Metric
 class BoundaryMeanIoU(Metric):
     """Boundary mIoU for multiclass segmentation.
 
-    Computes IoU on n-pixel-wide boundary bands of prediction and target for each class,
-    then aggregates (macro/micro). `ignore_index` is ignored in both pred/target.
+    Boundary IoU (Cheng et al., 2021) of each class: the IoU of the inner contour bands of prediction and target,
+    i.e. the class pixels within distance d of the class contour, where the image border counts as a contour. As in
+    the reference implementation (https://github.com/bowenc0221/boundary-iou-api), d defaults to 2 % of the image
+    diagonal (``dilation_ratio=0.02``) and the band is the mask minus its erosion by a (2d+1) x (2d+1) square.
+    Intersections and unions are accumulated over the dataset, then averaged over classes with a non-empty union
+    (macro) or pooled (micro). Pixels within d of an ``ignore_index`` target are left out, since their contours
+    depend on the missing labels.
 
     Metric based on https://arxiv.org/abs/2103.16562:
     Cheng, B., Girshick, R., Dollár, P., Berg, A. C., & Kirillov, A. (2021). Boundary IoU: Improving object-centric
     image segmentation evaluation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition.
+
+    Args:
+        num_classes: Number of classes.
+        thickness: Fixed band width d in pixels. ``None`` (default) derives it from ``dilation_ratio``.
+        dilation_ratio: Band width as a fraction of the image diagonal (paper default 0.02), used without ``thickness``.
+        ignore_index: Target value excluded from the metric.
+        average: ``"macro"`` or ``"micro"``.
+        include_background: Whether class 0 is scored.
     """
 
     full_state_update = False
@@ -20,7 +35,8 @@ class BoundaryMeanIoU(Metric):
     def __init__(
         self,
         num_classes: int,
-        thickness: int = 2,  # boundary band half-width in pixels
+        thickness: int | None = None,
+        dilation_ratio: float = 0.02,
         ignore_index: int | None = None,
         average: str = "macro",  # "macro" or "micro"
         include_background: bool = True,
@@ -33,13 +49,21 @@ class BoundaryMeanIoU(Metric):
 
         self.num_classes = num_classes
         self.thickness = thickness
+        self.dilation_ratio = dilation_ratio
         self.ignore_index = ignore_index
         self.average = average
         self.include_background = include_background
 
         # accumulators across batches
-        self.add_state("intersections", default=torch.zeros(num_classes, dtype=torch.int), dist_reduce_fx="sum")
-        self.add_state("unions", default=torch.zeros(num_classes, dtype=torch.int), dist_reduce_fx="sum")
+        self.add_state("intersections", default=torch.zeros(num_classes, dtype=torch.long), dist_reduce_fx="sum")
+        self.add_state("unions", default=torch.zeros(num_classes, dtype=torch.long), dist_reduce_fx="sum")
+
+    @staticmethod
+    def _inner_band(mask: Tensor, width: int) -> Tensor:
+        """Pixels of a (N, H, W) bool mask within `width` of its contour; outside the image counts as background."""
+        k = 2 * width + 1
+        eroded = -F.max_pool2d(-F.pad(mask.unsqueeze(1).float(), (width,) * 4), kernel_size=k, stride=1)
+        return mask & (eroded.squeeze(1) < 0.5)
 
     @torch.no_grad()
     def update(self, preds: Tensor, target: Tensor) -> None:
@@ -58,12 +82,13 @@ class BoundaryMeanIoU(Metric):
         if target.dim() != 3:
             raise ValueError("target must be (N,H,W)")
 
-        k = 2 * self.thickness + 1
+        width = self.thickness or max(1, int(round(self.dilation_ratio * math.hypot(*target.shape[-2:]))))
 
-        # mask out ignore_index everywhere
-        ignore_mask = torch.zeros_like(target, dtype=torch.bool)
+        # leave out pixels within `width` of an ignored target
+        valid = torch.ones_like(target, dtype=torch.bool)
         if self.ignore_index is not None:
-            ignore_mask = target == self.ignore_index
+            ignored = (target == self.ignore_index).unsqueeze(1).float()
+            valid = F.max_pool2d(ignored, kernel_size=2 * width + 1, stride=1, padding=width).squeeze(1) < 0.5
 
         # optionally skip background class
         start_cls = 0 if self.include_background else 1
@@ -72,30 +97,11 @@ class BoundaryMeanIoU(Metric):
             if self.ignore_index is not None and c == self.ignore_index:
                 continue
 
-            # binary masks for class c
-            pred_c = (preds_idx == c).float().unsqueeze(1)  # (N,1,H,W)
-            target_c = (target == c).float().unsqueeze(1)
+            bnd_pred = self._inner_band(preds_idx == c, width) & valid
+            bnd_target = self._inner_band(target == c, width) & valid
 
-            # compute boundary bands via morphological gradient on binary maps
-            dil_pred = F.max_pool2d(pred_c, kernel_size=k, stride=1, padding=self.thickness)
-            ero_pred = 1.0 - F.max_pool2d(1.0 - pred_c, kernel_size=k, stride=1, padding=self.thickness)
-            bnd_pred = (dil_pred - ero_pred).clamp_min(0.0) > 0.5  # (N,1,H,W) -> bool
-
-            dil_target = F.max_pool2d(target_c, kernel_size=k, stride=1, padding=self.thickness)
-            ero_target = 1.0 - F.max_pool2d(1.0 - target_c, kernel_size=k, stride=1, padding=self.thickness)
-            bnd_target = (dil_target - ero_target).clamp_min(0.0) > 0.5
-
-            # Apply ignore mask
-            bnd_pred = bnd_pred & ~ignore_mask
-            bnd_target = bnd_target & ~ignore_mask
-
-            # IoU on boundary bands
-            inter = (bnd_pred & bnd_target).sum()
-            union = (bnd_pred | bnd_target).sum()
-
-            # Accumulate
-            self.intersections[c] += inter
-            self.unions[c] += union
+            self.intersections[c] += (bnd_pred & bnd_target).sum()
+            self.unions[c] += (bnd_pred | bnd_target).sum()
 
     def compute(self) -> Tensor:
         eps = 1e-9

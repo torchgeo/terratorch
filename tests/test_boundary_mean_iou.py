@@ -6,6 +6,7 @@ to ensure maximum code coverage.
 
 import gc
 
+import numpy as np
 import pytest
 import torch
 
@@ -20,7 +21,8 @@ class TestBoundaryMeanIoUInitialization:
         metric = BoundaryMeanIoU(num_classes=5)
         
         assert metric.num_classes == 5
-        assert metric.thickness == 2
+        assert metric.thickness is None
+        assert metric.dilation_ratio == 0.02
         assert metric.ignore_index is None
         assert metric.average == "macro"
         assert metric.include_background is True
@@ -559,3 +561,85 @@ class TestBoundaryMeanIoUIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def _reference_boundary(mask, dilation_ratio=0.02):
+    """numpy port of mask_to_boundary from the Boundary IoU reference code (bowenc0221/boundary-iou-api):
+    zero-pad by 1, erode with a 3x3 kernel `d` times (cv2 border: no erosion from outside), mask minus erosion."""
+    h, w = mask.shape
+    d = max(1, int(round(dilation_ratio * np.sqrt(h**2 + w**2))))
+    e = np.pad(mask.astype(np.uint8), 1)
+    for _ in range(d):
+        p = np.pad(e, 1, constant_values=1)
+        e = np.min([p[i : i + h + 2, j : j + w + 2] for i in range(3) for j in range(3)], axis=0)
+    return mask.astype(bool) & ~e[1 : h + 1, 1 : w + 1].astype(bool)
+
+
+class TestBoundaryMeanIoUDefinition:
+    """BoundaryMeanIoU follows the definition of Cheng et al. (2021) and its reference implementation."""
+
+    @pytest.mark.parametrize("size", [(64, 64), (100, 60), (512, 512)])
+    def test_band_matches_reference(self, size):
+        g = torch.Generator().manual_seed(0)
+        mask = torch.nn.functional.interpolate(torch.rand(1, 1, 8, 8, generator=g), size=size)[0, 0] > 0.5
+        h, w = size
+        width = max(1, int(round(0.02 * np.hypot(h, w))))
+        band = BoundaryMeanIoU._inner_band(mask[None], width)[0].numpy()
+        np.testing.assert_array_equal(band, _reference_boundary(mask.numpy()))
+
+    def test_iou_matches_reference(self):
+        g = torch.Generator().manual_seed(1)
+        target = torch.randint(0, 3, (2, 1, 8, 8), generator=g).float()
+        target = torch.nn.functional.interpolate(target, size=(96, 96))[:, 0].long()
+        preds = torch.roll(target, shifts=3, dims=2)
+        metric = BoundaryMeanIoU(num_classes=3)
+        metric.update(preds, target)
+        ious = []
+        for c in range(3):
+            bp = np.stack([_reference_boundary((p == c).numpy()) for p in preds])
+            bt = np.stack([_reference_boundary((t == c).numpy()) for t in target])
+            ious.append((bp & bt).sum() / (bp | bt).sum())
+        assert metric.compute().item() == pytest.approx(np.mean(ious), abs=1e-6)
+
+    def test_band_width_scales_with_image(self):
+        target = torch.zeros(1, 512, 512, dtype=torch.long)
+        target[:, 128:384, 128:384] = 1
+        metric = BoundaryMeanIoU(num_classes=2, include_background=False)
+        metric.update(target, target)
+        d = round(0.02 * np.hypot(512, 512))  # 14 px
+        assert metric.unions[1] == 256**2 - (256 - 2 * d) ** 2
+
+    def test_inner_band_only(self):
+        """A prediction grown by d outside the object still covers the whole target band, but its own band lies
+        outside the target: Boundary IoU 0 for the object class."""
+        target = torch.zeros(1, 64, 64, dtype=torch.long)
+        target[:, 20:44, 20:44] = 1
+        d = round(0.02 * np.hypot(64, 64))  # 2 px
+        preds = torch.zeros_like(target)
+        preds[:, 20 - d : 44 + d, 20 - d : 44 + d] = 1
+        metric = BoundaryMeanIoU(num_classes=2, include_background=False)
+        metric.update(preds, target)
+        assert metric.compute() == 0
+
+    def test_image_border_is_contour(self):
+        target = torch.ones(1, 32, 32, dtype=torch.long)
+        metric = BoundaryMeanIoU(num_classes=2, include_background=False)
+        metric.update(target, target)
+        assert metric.unions[1] > 0 and metric.compute() == pytest.approx(1.0)
+
+    def test_errors_next_to_ignored_pixels_do_not_count(self):
+        target = torch.zeros(1, 64, 64, dtype=torch.long)
+        target[:, 16:48, 16:48] = 1
+        target[:, :, 32:] = 255
+        preds = torch.zeros_like(target)
+        preds[:, 16:48, 16:40] = 1  # wrong only inside / next to the ignored half
+        metric = BoundaryMeanIoU(num_classes=2, ignore_index=255)
+        metric.update(preds, target)
+        assert metric.compute() == pytest.approx(1.0)
+
+    def test_fixed_thickness(self):
+        target = torch.zeros(1, 64, 64, dtype=torch.long)
+        target[:, 16:48, 16:48] = 1
+        metric = BoundaryMeanIoU(num_classes=2, thickness=1, include_background=False)
+        metric.update(target, target)
+        assert metric.unions[1] == 32**2 - 30**2
