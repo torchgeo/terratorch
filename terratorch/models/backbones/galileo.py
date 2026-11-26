@@ -1508,7 +1508,7 @@ class Encoder(GalileoBase):
             encoder_config = model_config["encoder"]
         encoder = cls(**encoder_config)
 
-        state_dict = torch.load(folder / ENCODER_FILENAME, map_location=device)
+        state_dict = torch.load(folder / ENCODER_FILENAME, map_location=device, weights_only=True)
         for key in list(state_dict.keys()):
             # this cleans the state dict, which occasionally had an extra
             # ".backbone" included in the key names
