@@ -68,13 +68,20 @@ def test_native_patch_size_resolution(monkeypatch):
     class Dummy(torch.nn.Module):
         out_channels = [1]
 
+    class Embed(torch.nn.Module):
+        patch_size = [1, 8, 8]  # Prithvi-style
+
     def build(name, **kwargs):
         seen.update(kwargs)
-        return Dummy()
+        model = Dummy()
+        if kwargs.get("with_embed"):
+            model.embed = Embed()
+        return model
 
     monkeypatch.setattr("terratorch.models.utils.BACKBONE_REGISTRY.build", build)
-    assert _get_backbone("x", patch_resize=8).scale == 2  # default native 16
-    assert _get_backbone("x", patch_resize=4, patch_size=8).scale == 2 and seen.pop("patch_size") == 8
+    with pytest.warns(UserWarning, match="assuming 16"):
+        assert _get_backbone("x", patch_resize=8).scale == 2
+    assert _get_backbone("x", patch_resize=4, with_embed=True).scale == 2  # inferred native 8
     model = _get_backbone("x", patch_resize=4, patch_resize_native=32)
     assert model.scale == 8 and "patch_size" not in seen and "patch_resize_native" not in seen
 
