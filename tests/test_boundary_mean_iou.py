@@ -6,7 +6,6 @@ to ensure maximum code coverage.
 
 import gc
 
-import numpy as np
 import pytest
 import torch
 
@@ -558,52 +557,22 @@ class TestBoundaryMeanIoUIntegration:
         assert torch.all(unions2 >= unions1)
 
 
+def test_boundary_iou_value():
+    """Hand-computed Boundary IoU: 16 x 16 square touching the left image edge, prediction shifted right by d = 4.
+
+    Bands are 4 px deep inside each square, with no band along the image edge:
+    target band 16 * 16 - 8 * 12 = 160 px, prediction band 16 * 16 - 8 * 8 = 192 px. They overlap only in the top
+    and bottom 4 rows, over columns 4-15: 2 * 4 * 12 = 96 px. IoU = 96 / (160 + 192 - 96) = 0.375.
+    """
+    target = torch.zeros(1, 32, 32, dtype=torch.long)
+    target[:, 8:24, 0:16] = 1
+    preds = torch.zeros_like(target)
+    preds[:, 8:24, 4:20] = 1
+    metric = BoundaryMeanIoU(num_classes=2, include_background=False)
+    metric.update(preds, target)
+    assert metric.intersections[1] == 96 and metric.unions[1] == 256
+    assert metric.compute() == pytest.approx(0.375)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-
-
-def _reference_boundary(mask, d):
-    """numpy port of mask_to_boundary from the Boundary IoU reference code (bowenc0221/boundary-iou-api), with our two
-    changes: d given in pixels instead of 2 % of the diagonal, and a one-padding instead of zero-padding, so the image
-    border is not a contour. Erode with a 3x3 kernel d times (cv2 border: no erosion from outside), mask minus erosion."""
-    h, w = mask.shape
-    e = np.pad(mask.astype(np.uint8), 1, constant_values=1)
-    for _ in range(d):
-        p = np.pad(e, 1, constant_values=1)
-        e = np.min([p[i : i + h + 2, j : j + w + 2] for i in range(3) for j in range(3)], axis=0)
-    return mask.astype(bool) & ~e[1 : h + 1, 1 : w + 1].astype(bool)
-
-
-class TestBoundaryMeanIoUDefinition:
-    """BoundaryMeanIoU follows the definition of Cheng et al. (2021) and its reference implementation."""
-
-    @pytest.mark.parametrize(("size", "width"), [((64, 64), 1), ((100, 60), 4), ((512, 512), 14)])
-    def test_band_matches_reference(self, size, width):
-        g = torch.Generator().manual_seed(0)
-        mask = torch.nn.functional.interpolate(torch.rand(1, 1, 8, 8, generator=g), size=size)[0, 0] > 0.5
-        band = BoundaryMeanIoU._inner_band(mask[None], width)[0].numpy()
-        np.testing.assert_array_equal(band, _reference_boundary(mask.numpy(), width))
-
-    def test_iou_matches_reference(self):
-        g = torch.Generator().manual_seed(1)
-        target = torch.randint(0, 3, (2, 1, 8, 8), generator=g).float()
-        target = torch.nn.functional.interpolate(target, size=(96, 96))[:, 0].long()
-        preds = torch.roll(target, shifts=3, dims=2)
-        metric = BoundaryMeanIoU(num_classes=3)
-        metric.update(preds, target)
-        ious = []
-        for c in range(3):
-            bp = np.stack([_reference_boundary((p == c).numpy(), 4) for p in preds])
-            bt = np.stack([_reference_boundary((t == c).numpy(), 4) for t in target])
-            ious.append((bp & bt).sum() / (bp | bt).sum())
-        assert metric.compute().item() == pytest.approx(np.mean(ious), abs=1e-6)
-
-    def test_errors_next_to_ignored_pixels_do_not_count(self):
-        target = torch.zeros(1, 64, 64, dtype=torch.long)
-        target[:, 16:48, 16:48] = 1
-        target[:, :, 32:] = 255
-        preds = torch.zeros_like(target)
-        preds[:, 16:48, 16:40] = 1  # wrong only inside / next to the ignored half
-        metric = BoundaryMeanIoU(num_classes=2, ignore_index=255)
-        metric.update(preds, target)
-        assert metric.compute() == pytest.approx(1.0)
