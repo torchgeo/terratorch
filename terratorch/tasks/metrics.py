@@ -7,15 +7,19 @@ from torchmetrics import Metric
 class BoundaryMeanIoU(Metric):
     """Boundary mIoU for multiclass segmentation.
 
-    Boundary IoU (Cheng et al., 2021) of each class: the IoU of the inner contour bands of prediction and target,
-    i.e. the class pixels within d = ``thickness`` pixels of the class contour, where the image border counts as a
-    contour. As in the reference implementation (https://github.com/bowenc0221/boundary-iou-api), the band is the
-    mask minus its erosion by a (2d+1) x (2d+1) square. Unlike the reference, which sets d to 2 % of the image
-    diagonal, d is fixed in pixels (default 4): at a fixed ground sample distance this is a fixed distance on the
-    ground, independent of the tile size.
-    Intersections and unions are accumulated over the dataset, then averaged over classes with a non-empty union
-    (macro) or pooled (micro). Pixels within d of an ``ignore_index`` target are left out, since their contours
-    depend on the missing labels (the reference leaves out only the ignored pixels themselves).
+    Boundary IoU (Cheng et al., 2021) per class: the IoU of the inner contour bands of prediction and target, i.e.
+    the class pixels within d = ``thickness`` pixels of a class contour (mask minus its erosion by a (2d+1)^2 square).
+    Intersections and unions are summed over the dataset, then averaged over classes with a non-empty union (macro)
+    or pooled (micro).
+
+    Differences from the reference implementation (https://github.com/bowenc0221/boundary-iou-api), for tiled
+    remote sensing data:
+
+    - d is fixed in pixels (default 4), not 2 % of the image diagonal: at a fixed ground sample distance this is a
+      fixed ground distance, independent of the tile size.
+    - The image border is not a contour: tile edges are arbitrary cuts, and bands along them would match trivially.
+    - Pixels within d of an ``ignore_index`` target are left out, not only the ignored pixels: contours next to
+      missing labels are artifacts of the missing labels.
 
     Metric based on https://arxiv.org/abs/2103.16562:
     Cheng, B., Girshick, R., Dollár, P., Berg, A. C., & Kirillov, A. (2021). Boundary IoU: Improving object-centric
@@ -57,9 +61,9 @@ class BoundaryMeanIoU(Metric):
 
     @staticmethod
     def _inner_band(mask: Tensor, width: int) -> Tensor:
-        """Pixels of a (N, H, W) bool mask within `width` of its contour; outside the image counts as background."""
-        k = 2 * width + 1
-        eroded = -F.max_pool2d(-F.pad(mask.unsqueeze(1).float(), (width,) * 4), kernel_size=k, stride=1)
+        """Pixels of a (N, H, W) bool mask within `width` of its contour; the image border is not a contour."""
+        # erosion as a min-pool; max_pool2d pads -x with -inf, so the outside never erodes the mask
+        eroded = -F.max_pool2d(-mask.unsqueeze(1).float(), kernel_size=2 * width + 1, stride=1, padding=width)
         return mask & (eroded.squeeze(1) < 0.5)
 
     @torch.no_grad()

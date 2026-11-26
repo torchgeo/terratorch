@@ -563,11 +563,11 @@ if __name__ == "__main__":
 
 
 def _reference_boundary(mask, d):
-    """numpy port of mask_to_boundary from the Boundary IoU reference code (bowenc0221/boundary-iou-api), with the
-    band width d given directly instead of as 2 % of the diagonal: zero-pad by 1, erode with a 3x3 kernel d times
-    (cv2 border: no erosion from outside), mask minus erosion."""
+    """numpy port of mask_to_boundary from the Boundary IoU reference code (bowenc0221/boundary-iou-api), with our two
+    changes: d given in pixels instead of 2 % of the diagonal, and a one-padding instead of zero-padding, so the image
+    border is not a contour. Erode with a 3x3 kernel d times (cv2 border: no erosion from outside), mask minus erosion."""
     h, w = mask.shape
-    e = np.pad(mask.astype(np.uint8), 1)
+    e = np.pad(mask.astype(np.uint8), 1, constant_values=1)
     for _ in range(d):
         p = np.pad(e, 1, constant_values=1)
         e = np.min([p[i : i + h + 2, j : j + w + 2] for i in range(3) for j in range(3)], axis=0)
@@ -618,11 +618,12 @@ class TestBoundaryMeanIoUDefinition:
         metric.update(preds, target)
         assert metric.compute() == 0
 
-    def test_image_border_is_contour(self):
-        target = torch.ones(1, 32, 32, dtype=torch.long)
-        metric = BoundaryMeanIoU(num_classes=2, include_background=False)
+    def test_image_border_is_not_contour(self):
+        target = torch.zeros(1, 32, 32, dtype=torch.long)
+        target[:, :, :16] = 1  # one contour, at column 16
+        metric = BoundaryMeanIoU(num_classes=2, thickness=2, include_background=False)
         metric.update(target, target)
-        assert metric.unions[1] > 0 and metric.compute() == pytest.approx(1.0)
+        assert metric.unions[1] == 32 * 2
 
     def test_errors_next_to_ignored_pixels_do_not_count(self):
         target = torch.zeros(1, 64, 64, dtype=torch.long)
