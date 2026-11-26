@@ -752,10 +752,12 @@ if __name__ == '__main__':
 
 
 def test_terramind_patch_size():
-    """patch_size reaches the pre-trained modality embeddings; with pre-trained weights it must be 16."""
+    """patch_size reaches the pre-trained modality embeddings; with pre-trained weights it warns."""
     model = build_terrammind_vit(modalities=["S2L2A"], patch_size=8, encoder_depth=1, dim=64, num_heads=1,
                                  tokenizer_dict=tokenizer_dict["v1"])
     assert model.encoder_embeddings["untok_sen2l2a@224"].patch_size == (8, 8)
     assert model({"S2L2A": torch.randn(1, 12, 32, 32)})[-1].shape == (1, 16, 64)
-    with pytest.raises(ValueError, match="backbone_patch_resize"):
-        build_terrammind_vit(variant="terramind_v1_tiny", pretrained=True, modalities=["S2L2A"], patch_size=8)
+    with patch("terratorch.models.backbones.terramind.model.terramind_register.hf_hub_download"), \
+            patch("torch.load", return_value=model.state_dict()), pytest.warns(UserWarning, match="randomly"):
+        build_terrammind_vit(variant="terramind_v1_tiny", pretrained=True, modalities=["S2L2A"], patch_size=8,
+                             encoder_depth=1, dim=64, num_heads=1, tokenizer_dict=tokenizer_dict["v1"])

@@ -515,11 +515,12 @@ def build_terrammind_vit(
     **kwargs,
 ):
     if pretrained and kwargs.get("patch_size", 16) != 16:
-        msg = (
-            f"Pre-trained TerraMind uses 16x16 patch embeddings, got patch_size={kwargs['patch_size']}. "
-            f"Use backbone_patch_resize: {kwargs['patch_size']} to resize the input instead."
+        warnings.warn(
+            f"Pre-trained TerraMind uses 16x16 patch embeddings, got patch_size={kwargs['patch_size']}: the patch "
+            f"embeddings are randomly initialized. Use backbone_patch_resize: {kwargs['patch_size']} instead to keep "
+            "the pre-trained patch embeddings and resize the input.",
+            stacklevel=2,
         )
-        raise ValueError(msg)
 
     model = TerraMindViT(pretrained=pretrained, **kwargs)
 
