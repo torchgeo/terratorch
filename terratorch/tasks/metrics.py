@@ -7,8 +7,10 @@ from torchmetrics import Metric
 class BoundaryMeanIoU(Metric):
     """Boundary mIoU for multiclass segmentation.
 
-    Boundary IoU (Cheng et al., 2021) per class: the IoU of the inner contour bands of prediction and target, i.e.
-    the class pixels within d = ``thickness`` pixels of a class contour (mask minus its erosion by a (2d+1)^2 square).
+    Boundary IoU (Cheng et al., 2021) per class: the IoU of the boundary bands of prediction and target. The band of
+    a class is its pixels that have a pixel of another class within d = ``thickness`` pixels, i.e. whose
+    (2d+1) x (2d+1) neighbourhood is not all that class: a d px deep strip along the inside of each class contour.
+    It is computed as the class mask minus its erosion.
     Intersections and unions are summed over the dataset, then averaged over classes with a non-empty union (macro)
     or pooled (micro).
 
