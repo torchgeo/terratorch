@@ -80,7 +80,7 @@ class TestOlmoEarthBackbone:
         )
         assert model is not None
         assert model.embed_dim == 128
-        assert model.out_channels == [128]
+        assert model.out_channels == [128] * 4  # one per block of Nano
         gc.collect()
 
     @skip_no_olmoearth
@@ -100,7 +100,7 @@ class TestOlmoEarthBackbone:
         outputs = model(x)
 
         assert isinstance(outputs, list)
-        assert len(outputs) == 1
+        assert len(outputs) == 4  # one per block of Nano
         # With patch_size=8 and input 64x64, expect 8x8 spatial output
         assert outputs[0].shape == (1, 128, 8, 8)
         gc.collect()
@@ -165,10 +165,10 @@ class TestOlmoEarthMultimodalTemporal:
             task="segmentation", backbone="olmoearth_v1_nano", backbone_pretrained=False, backbone_patch_size=8,
             backbone_temporal_pooling="concat", backbone_n_timestamps=3, decoder="FCNDecoder", num_classes=2,
         ).encoder.eval()
-        assert concat.out_channels == [3 * 128]
+        assert concat.out_channels == [3 * 128] * 4
         with torch.no_grad():
-            assert self._model()(x)[0].shape == (1, 128, 4, 4)
-            assert concat(x)[0].shape == (1, 3 * 128, 4, 4)
+            assert self._model()(x)[-1].shape == (1, 128, 4, 4)
+            assert concat(x)[-1].shape == (1, 3 * 128, 4, 4)
             for t in (2, 1):  # T=1 imagery is not repeated over time, only e.g. srtm
                 with pytest.raises(ValueError, match="time steps"):
                     concat(x[:, :, :t])
@@ -184,9 +184,9 @@ class TestOlmoEarthMultimodalTemporal:
         x = torch.randn(1, 14, 32, 32)
         order = [self.S2.index(b) for b in _olmoearth_api().Modality.get("sentinel2_l2a").band_order]
         with torch.no_grad():
-            m, c = mean(x)[0], concat(x)[0]
-            assert torch.allclose(m, mean({"sentinel2_l2a": x[:, order], "sentinel1": x[:, 12:]})[0])
-        assert concat.out_channels == [2 * 128] and c.shape == (1, 256, 4, 4)
+            m, c = mean(x)[-1], concat(x)[-1]
+            assert torch.allclose(m, mean({"sentinel2_l2a": x[:, order], "sentinel1": x[:, 12:]})[-1])
+        assert concat.out_channels == [2 * 128] * 4 and c.shape == (1, 256, 4, 4)
         assert torch.allclose(m, (c[:, :128] + c[:, 128:]) / 2, atol=1e-6)
 
     @skip_no_olmoearth
@@ -197,12 +197,12 @@ class TestOlmoEarthMultimodalTemporal:
         assert model.missing_band_sets == {"sentinel2_l2a": [1, 2]}
         x = torch.randn(2, 4, 32, 32)
         torch.manual_seed(0)
-        out = model(x)[0]
+        out = model(x)[-1]
         assert out.shape == (2, 128, 4, 4)
         # skipping the all-True attention mask is exact: same as the encoder's own masked path
         model.encoder._maybe_get_attn_mask = type(model.encoder)._maybe_get_attn_mask.__get__(model.encoder)
         torch.manual_seed(0)
-        assert torch.allclose(out, model(x)[0], atol=1e-5)
+        assert torch.allclose(out, model(x)[-1], atol=1e-5)
 
 
 

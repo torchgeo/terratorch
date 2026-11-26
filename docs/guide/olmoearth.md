@@ -27,10 +27,12 @@ the lighter `olmoearth-pretrain-minimal`; both work.
       backbone_bands:  # input channels per modality, in input order
         sentinel2_l2a: [B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B11, B12]
         sentinel1: [vv, vh]
-      backbone_out_indices: [2, 5, 8, 11]  # for hierarchical decoders
-      necks:
+      necks:  # recommended for UNetDecoder: four evenly spaced blocks -> 4-level pyramid
+        - name: SelectIndices
+          indices: [2, 5, 8, 11]  # of the 12 blocks of tiny and base; large: [5, 11, 17, 23]
         - name: LearnedInterpolateToPyramidal
       decoder: UNetDecoder
+      decoder_channels: [256, 128, 64, 32]
       ...
     ```
 
@@ -44,9 +46,12 @@ the lighter `olmoearth-pretrain-minimal`; both work.
             "sentinel2_l2a": ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B09", "B11", "B12"],
             "sentinel1": ["vv", "vh"],
         },
-        "backbone_out_indices": [2, 5, 8, 11],
-        "necks": [{"name": "LearnedInterpolateToPyramidal"}],
+        "necks": [  # recommended for UNetDecoder: four evenly spaced blocks -> 4-level pyramid
+            {"name": "SelectIndices", "indices": [2, 5, 8, 11]},  # 12 blocks (tiny, base); large: [5, 11, 17, 23]
+            {"name": "LearnedInterpolateToPyramidal"},
+        ],
         "decoder": "UNetDecoder",
+        "decoder_channels": [256, 128, 64, 32],
         ...
     }
     ```
@@ -55,7 +60,8 @@ the lighter `olmoearth-pretrain-minimal`; both work.
   order; it can be a subset, e.g. RGBN: band sets without any given band are masked as missing (v1.2 was trained with
   band dropout), missing bands of a partly given band set are zero. Without `bands`, the input is one `modality`
   (default `sentinel2_l2a`) with all bands in OlmoEarth's order. A dict `{modality: tensor}` works as well.
-- Output: feature maps `[B, D, H / patch_size, W / patch_size]`, averaged over band sets and modalities.
+- Output: one feature map `[B, D, H / patch_size, W / patch_size]` per encoder block (the last is the final,
+  normed encoder output), averaged over band sets and modalities. Pick blocks with `SelectIndices`.
   `modality_pooling: concat` stacks the modalities instead (`[B, n_modalities * D, ...]`).
 - `temporal_pooling`: `mean` (default) or `concat` (time stacked into channels, needs `n_timestamps`).
 - `patch_size` (default 8, the base patch size) can be any size with the pre-trained weights: OlmoEarth resizes the

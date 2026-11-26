@@ -20,7 +20,6 @@ References:
 
 import logging
 import warnings
-from collections.abc import Callable
 from types import SimpleNamespace
 
 import torch
@@ -171,7 +170,6 @@ class OlmoEarthBackbone(nn.Module):
         bands: dict[str, list[str]] | None = None,
         temporal_pooling: str = "mean",
         n_timestamps: int = 1,
-        out_indices: list[int] | None = None,
         fast_pass: bool = True,
         modality_pooling: str = "mean",
     ):
@@ -193,8 +191,6 @@ class OlmoEarthBackbone(nn.Module):
             temporal_pooling: "mean" averages the time steps (default). "concat" stacks them into
                 channels, giving (B, n_timestamps * D, H', W') for a temporal neck or decoder.
             n_timestamps: Number of time steps, required for "concat".
-            out_indices: Encoder blocks whose outputs are returned, for multi-scale decoders
-                (e.g. ``[2, 5, 8, 11]``). Defaults to the final encoder output only.
             fast_pass: Pass no attention mask in training (default True), so SDPA can use its memory-efficient
                 kernels; with a mask it expands to (B, heads, N, N), which runs out of memory at small patch
                 sizes. Exact here, since this wrapper never masks tokens; in eval the encoder skips the mask anyway.
@@ -281,51 +277,40 @@ class OlmoEarthBackbone(nn.Module):
 
             self.encoder._maybe_get_attn_mask = attn_mask_unless_vacuous
 
-        self.out_indices = None
-        if out_indices:
-            depth = len(self.encoder.blocks)
-            if any(i < -depth or i >= depth for i in out_indices):
-                msg = f"out_indices must be between {-depth} and {depth - 1}, got {out_indices}"
-                raise ValueError(msg)
-            self.out_indices = [i % depth for i in out_indices]
-            self._captured: dict[int, Tensor] = {}
-            for i in set(self.out_indices):
-                self.encoder.blocks[i].register_forward_hook(self._capture_hook(i))
-            # The encoder regroups its flat token sequence per modality with a dims dict that is
-            # local to its forward. Record it so captured blocks can be regrouped the same way.
-            regroup = self.encoder.split_and_expand_per_modality
-            self._regroup = regroup
+        # Return every block's output, like TerraMind and Prithvi (pick with SelectIndices); the last is the
+        # encoder's final, normed output. The encoder regroups its flat token sequence per modality with a dims
+        # dict local to its forward, and without fast_pass removes masked tokens; record both so the captured
+        # blocks are treated the same way.
+        self._captured: list[Tensor] = []
+        for block in self.encoder.blocks:
+            block.register_forward_hook(
+                lambda _module, _inputs, out: self._captured.append(out[0] if isinstance(out, tuple) else out)
+            )
+        regroup = self.encoder.split_and_expand_per_modality
+        self._regroup = regroup
 
-            def recording_regroup(tokens, modalities_to_dims_dict, *args, **kwargs):
-                self._dims = modalities_to_dims_dict
-                return regroup(tokens, modalities_to_dims_dict, *args, **kwargs)
+        def recording_regroup(tokens, modalities_to_dims_dict, *args, **kwargs):
+            self._dims = modalities_to_dims_dict
+            return regroup(tokens, modalities_to_dims_dict, *args, **kwargs)
 
-            self.encoder.split_and_expand_per_modality = recording_regroup
+        self.encoder.split_and_expand_per_modality = recording_regroup
 
-            # Without fast_pass, the blocks see the token sequence with masked tokens removed. Record the removal
-            # so captured blocks can be put back in place, as the encoder does for its final output.
-            remove = self.encoder._maybe_remove_masked_tokens
-            self._removal = (None, None)
+        remove = self.encoder._maybe_remove_masked_tokens
+        self._removal = (None, None)
 
-            def recording_remove(tokens, mask, fast_pass):
-                out = remove(tokens, mask, fast_pass)
-                self._removal = (out[1], out[2])  # indices, new_mask
-                return out
+        def recording_remove(tokens, mask, fast_pass):
+            out = remove(tokens, mask, fast_pass)
+            self._removal = (out[1], out[2])  # indices, new_mask
+            return out
 
-            self.encoder._maybe_remove_masked_tokens = recording_remove
-
-    def _capture_hook(self, idx: int) -> Callable:
-        def hook(_module, _inputs, output):
-            self._captured[idx] = output[0] if isinstance(output, tuple) else output
-
-        return hook
+        self.encoder._maybe_remove_masked_tokens = recording_remove
 
     @property
     def out_channels(self) -> list[int]:
         """Return the output channel dimensions for each feature level."""
         channels = self.embed_dim * (self.n_timestamps if self.temporal_pooling == "concat" else 1)
         channels *= len(self.band_split) if self.modality_pooling == "concat" else 1
-        return [channels] * (len(self.out_indices) if self.out_indices else 1)
+        return [channels] * len(self.encoder.blocks)
 
     def forward(
         self, x: Tensor | dict[str, Tensor], timestamps: Tensor | None = None, **kwargs: object
@@ -395,14 +380,12 @@ class OlmoEarthBackbone(nn.Module):
             fast_pass=self.fast_pass and not self.has_missing,  # missing band sets need token removal
         )
 
-        if not self.out_indices:
-            return [self._to_feature_map(encoder_output["tokens_and_masks"], inputs)]
-        captured = [self._captured[i] for i in self.out_indices]
-        self._captured = {}
+        captured, self._captured = self._captured[:-1], []  # the last block is replaced by the final output
         indices, new_mask = self._removal
         if indices is not None:
             captured = [self.encoder.add_removed_tokens(tokens, indices, new_mask)[0] for tokens in captured]
-        return [self._to_feature_map(self._regroup(tokens, self._dims), inputs) for tokens in captured]
+        maps = [self._to_feature_map(self._regroup(tokens, self._dims), inputs) for tokens in captured]
+        return maps + [self._to_feature_map(encoder_output["tokens_and_masks"], inputs)]
 
     def _to_feature_map(self, tokens_and_masks, inputs: dict[str, Tensor]) -> Tensor:
         """(B, H', W', T, band_sets, D) per modality -> (B, out_channels, H', W')."""
@@ -446,7 +429,6 @@ def _create_olmoearth_backbone(
     bands: dict[str, list[str]] | None = None,
     temporal_pooling: str = "mean",
     n_timestamps: int = 1,
-    out_indices: list[int] | None = None,
     fast_pass: bool = True,
     modality_pooling: str = "mean",
     **kwargs,
@@ -479,7 +461,6 @@ def _create_olmoearth_backbone(
         bands=bands,
         temporal_pooling=temporal_pooling,
         n_timestamps=n_timestamps,
-        out_indices=out_indices,
         fast_pass=fast_pass,
         modality_pooling=modality_pooling,
     )
