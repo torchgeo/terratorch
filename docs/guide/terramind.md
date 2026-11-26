@@ -203,6 +203,22 @@ out[-1].shape  # Output shape: [Batch, Tokens, Embedding]
 # torch.Size([1, 196, 768])
 ```
 
+### Patch Size
+
+`backbone_patch_size` sets the patch size of all patch embeddings. The pre-trained patch embeddings are
+16x16, so with any other size they are randomly initialized (with a warning); the rest of the model still
+loads its pre-trained weights. To keep the pre-trained patch embeddings, set `backbone_patch_resize` instead.
+It upsamples the input so that one 16x16 patch covers `backbone_patch_resize` input pixels, FlexiViT-style,
+and keeps the pre-trained patch embeddings unchanged. E.g., `backbone_patch_resize: 8` resizes a 256 px
+input to 512 px, giving 32 x 32 tokens. Labels keep their resolution.
+
+```yaml
+backbone: terramind_v1_base
+backbone_pretrained: True
+backbone_modalities: [S2L2A, S1RTC]
+backbone_patch_resize: 8
+```
+
 ### Subset of Input Bands
 
 Use the `bands` dict to select a subset of the pre-trained bands. Unlisted modalities expect all bands as inputs.

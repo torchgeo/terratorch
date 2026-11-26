@@ -926,6 +926,8 @@ def build_modality_embeddings(modality_info, modalities, cond_modalities=None, i
             raise NotImplementedError(f"Could not find modality {modality} in default modality info.")
 
         mod_info = modality_info[key]
+        if patch_size is not None:  # pre-trained modalities default to their MODALITY_INFO patch size (16)
+            mod_info = {**mod_info, "patch_size": patch_size}
         mod_embeddings[key] = mod_info["encoder_embedding"](image_size=img_size, dim_tokens=dim, **mod_info)
         mod_name_mapping[modality] = key  # Requires manual mapping for loading model weights
 
