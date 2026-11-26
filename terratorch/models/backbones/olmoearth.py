@@ -207,8 +207,7 @@ class OlmoEarthBackbone(nn.Module):
 
         oe = _olmoearth_api()
         ModelID, load_model_from_id, load_model_from_path = oe.ModelID, oe.load_model_from_id, oe.load_model_from_path
-        ModalitySpec = oe.Modality
-        self._modality_spec = ModalitySpec  # is_multitemporal in _to_feature_map
+        ModalitySpec = self._modality_spec = oe.Modality  # also used by _to_feature_map
 
         self.patch_size = patch_size
         self.input_res = input_res

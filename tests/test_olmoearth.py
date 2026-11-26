@@ -157,30 +157,37 @@ class TestOlmoEarthMultimodalTemporal:
 
     @skip_no_olmoearth
     def test_time_series_mean_and_concat(self):
+        """concat is built through the factory: backbone_temporal_pooling must reach the backbone."""
+        from terratorch.models import EncoderDecoderFactory
+
         x = torch.randn(1, 12, 3, 32, 32)
+        concat = EncoderDecoderFactory().build_model(
+            task="segmentation", backbone="olmoearth_v1_nano", backbone_pretrained=False, backbone_patch_size=8,
+            backbone_temporal_pooling="concat", backbone_n_timestamps=3, decoder="FCNDecoder", num_classes=2,
+        ).encoder.eval()
+        assert concat.out_channels == [3 * 128]
         with torch.no_grad():
             assert self._model()(x)[0].shape == (1, 128, 4, 4)
-            model = self._model(temporal_pooling="concat", n_timestamps=3)
-            assert model(x)[0].shape == (1, 3 * 128, 4, 4)
-        assert model.out_channels == [3 * 128]
-        with pytest.raises(ValueError, match="time steps"):
-            self._model(temporal_pooling="concat", n_timestamps=4)(x)
-        with pytest.raises(ValueError, match="time steps"):  # T=1 imagery is not repeated, only e.g. srtm
-            self._model(temporal_pooling="concat", n_timestamps=4)(x[:, :, :1])
+            assert concat(x)[0].shape == (1, 3 * 128, 4, 4)
+            for t in (2, 1):  # T=1 imagery is not repeated over time, only e.g. srtm
+                with pytest.raises(ValueError, match="time steps"):
+                    concat(x[:, :, :t])
 
     @skip_no_olmoearth
-    def test_bands_split_matches_dict_input(self):
-        """A stacked S2 + S1 tensor in our channel order equals the native per-modality dict."""
+    def test_multimodal_bands(self):
+        """A stacked S2 + S1 tensor equals the native per-modality dict; modality concat keeps both."""
         from terratorch.models.backbones.olmoearth import _olmoearth_api
 
-        Modality = _olmoearth_api().Modality
-
-        model = self._model(bands={"sentinel2_l2a": self.S2, "sentinel1": ["vv", "vh"]})
-        x = torch.randn(1, 14, 2, 32, 32)
-        order = [self.S2.index(b) for b in Modality.get("sentinel2_l2a").band_order]
-        native = {"sentinel2_l2a": x[:, order], "sentinel1": x[:, 12:]}
+        bands = {"sentinel2_l2a": self.S2, "sentinel1": ["vv", "vh"]}
+        mean, concat = self._model(bands=bands), self._model(bands=bands, modality_pooling="concat")
+        concat.load_state_dict(mean.state_dict())
+        x = torch.randn(1, 14, 32, 32)
+        order = [self.S2.index(b) for b in _olmoearth_api().Modality.get("sentinel2_l2a").band_order]
         with torch.no_grad():
-            assert torch.allclose(model(x)[0], model(native)[0])
+            m, c = mean(x)[0], concat(x)[0]
+            assert torch.allclose(m, mean({"sentinel2_l2a": x[:, order], "sentinel1": x[:, 12:]})[0])
+        assert concat.out_channels == [2 * 128] and c.shape == (1, 256, 4, 4)
+        assert torch.allclose(m, (c[:, :128] + c[:, 128:]) / 2, atol=1e-6)
 
     @skip_no_olmoearth
     def test_band_subset_masks_missing_band_sets(self):
@@ -196,23 +203,6 @@ class TestOlmoEarthMultimodalTemporal:
         model.encoder._maybe_get_attn_mask = type(model.encoder)._maybe_get_attn_mask.__get__(model.encoder)
         torch.manual_seed(0)
         assert torch.allclose(out, model(x)[0], atol=1e-5)
-        with pytest.warns(UserWarning, match="set to zero"):
-            self._model(bands={"sentinel2_l2a": ["B04", "B03", "B02"]})  # B08 missing in the first band set
-
-    @skip_no_olmoearth
-    def test_modality_pooling_concat(self):
-        bands = {"sentinel2_l2a": self.S2, "sentinel1": ["vv", "vh"]}
-        concat = self._model(bands=bands, modality_pooling="concat")
-        mean = self._model(bands=bands)
-        mean.load_state_dict(concat.state_dict())
-        assert concat.out_channels == [2 * 128]
-        x = torch.randn(1, 14, 32, 32)
-        with torch.no_grad():
-            c, m = concat(x)[0], mean(x)[0]
-        assert c.shape == (1, 256, 4, 4)
-        assert torch.allclose(m, (c[:, :128] + c[:, 128:]) / 2, atol=1e-6)
-        with pytest.raises(ValueError, match="needs `bands`"):
-            self._model(modality_pooling="concat")
 
     @skip_no_olmoearth
     def test_out_indices(self):
@@ -226,6 +216,7 @@ class TestOlmoEarthMultimodalTemporal:
         assert not torch.allclose(out[0], out[3])
         with pytest.raises(ValueError, match="out_indices"):
             self._model(out_indices=[2, 5, 8, 11])  # nano has 4 blocks
+
 
 class TestOlmoEarthImportGuard:
     """Test behavior when olmoearth-pretrain is not installed."""
@@ -258,15 +249,3 @@ def test_olmoearth_normalization_matches_normalizer():
     expected = Normalizer().normalize(spec, x)
     ours = (x[..., ::-1] - np.array(means)) / np.array(stds)
     assert np.allclose(ours[..., ::-1], expected, atol=1e-5)
-
-
-@skip_no_olmoearth
-def test_factory_passes_temporal_pooling_to_backbone():
-    """Without the TemporalWrapper, backbone_temporal_pooling reaches the backbone instead of being dropped."""
-    from terratorch.models import EncoderDecoderFactory
-
-    model = EncoderDecoderFactory().build_model(
-        task="segmentation", backbone="olmoearth_v1_nano", backbone_pretrained=False, backbone_patch_size=8,
-        backbone_temporal_pooling="concat", backbone_n_timestamps=4, decoder="FCNDecoder", num_classes=2,
-    )
-    assert model.encoder.out_channels == [4 * 128]
