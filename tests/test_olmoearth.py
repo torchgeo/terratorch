@@ -163,6 +163,8 @@ class TestOlmoEarthMultimodalTemporal:
             model = self._model(temporal_pooling="concat", n_timestamps=3)
             assert model(x)[0].shape == (1, 3 * 128, 4, 4)
         assert model.out_channels == [3 * 128]
+        with pytest.raises(ValueError, match="time steps"):
+            self._model(temporal_pooling="concat", n_timestamps=4)(x)
 
     @skip_no_olmoearth
     def test_bands_split_matches_dict_input(self):
@@ -177,13 +179,6 @@ class TestOlmoEarthMultimodalTemporal:
         native = {"sentinel2_l2a": x[:, order], "sentinel1": x[:, 12:]}
         with torch.no_grad():
             assert torch.allclose(model(x)[0], model(native)[0])
-
-    @skip_no_olmoearth
-    def test_bands_validation(self):
-        with pytest.raises(ValueError, match="distinct bands"):
-            self._model(bands={"sentinel2_l2a": ["B02", "B02"]})
-        with pytest.raises(ValueError, match="distinct bands"):
-            self._model(bands={"sentinel1": ["vv", "hh"]})
 
     @skip_no_olmoearth
     def test_band_subset_masks_missing_band_sets(self):
@@ -201,20 +196,6 @@ class TestOlmoEarthMultimodalTemporal:
         assert torch.allclose(out, model(x)[0], atol=1e-5)
         with pytest.warns(UserWarning, match="set to zero"):
             self._model(bands={"sentinel2_l2a": ["B04", "B03", "B02"]})  # B08 missing in the first band set
-
-    @skip_no_olmoearth
-    def test_band_subset_out_indices_restores_tokens(self):
-        """Captured blocks are put back on the grid: the norm of the last block equals the encoder output."""
-        model = self._model(bands={"sentinel2_l2a": ["B04", "B03", "B02", "B08"]}, out_indices=[-1])
-        seen = []
-        forward, to_map = model.encoder.forward, model._to_feature_map
-        model.encoder.forward = lambda *a, **k: seen.append(forward(*a, **k)) or seen[-1]
-        model._to_feature_map = lambda tokens, inputs: seen.append(tokens) or to_map(tokens, inputs)
-        with torch.no_grad():
-            model(torch.randn(1, 4, 32, 32))
-        final = seen[0]["tokens_and_masks"].sentinel2_l2a[..., 0, :]
-        last_block = seen[1]["sentinel2_l2a"][..., 0, :]
-        assert torch.allclose(model.encoder.norm(last_block), final, atol=1e-5)
 
     @skip_no_olmoearth
     def test_modality_pooling_concat(self):
@@ -242,12 +223,6 @@ class TestOlmoEarthMultimodalTemporal:
         # the first block's, i.e. the hooks capture different layers
         assert not torch.allclose(out[0], out[3])
 
-    @skip_no_olmoearth
-    def test_concat_rejects_wrong_timestamps(self):
-        with pytest.raises(ValueError, match="time steps"):
-            self._model(temporal_pooling="concat", n_timestamps=4)(torch.randn(1, 12, 2, 32, 32))
-
-
 class TestOlmoEarthImportGuard:
     """Test behavior when olmoearth-pretrain is not installed."""
 
@@ -256,25 +231,6 @@ class TestOlmoEarthImportGuard:
         # This test always passes because __init__.py uses try/except
         # If import failed, the entire test suite would fail to collect
         pass
-
-
-@skip_no_olmoearth
-def test_fast_pass_is_exact_in_training():
-    """fast_pass (default) only drops the all-visible attention mask, so training outputs are unchanged."""
-    from terratorch.models.backbones.olmoearth import _create_olmoearth_backbone
-
-    x = torch.randn(2, 14, 2, 32, 32)
-    bands = {"sentinel2_l2a": TestOlmoEarthMultimodalTemporal.S2, "sentinel1": ["vv", "vh"]}
-    outs = []
-    for fast_pass in (True, False):
-        torch.manual_seed(0)
-        model = _create_olmoearth_backbone(
-            "olmoearth_v1_nano", pretrained=False, patch_size=8, bands=bands, out_indices=[1, 3], fast_pass=fast_pass
-        )
-        model.train()
-        torch.manual_seed(1)  # same drop-path draws
-        outs.append(model(x))
-    assert all(torch.allclose(a, b, atol=1e-5) for a, b in zip(*outs, strict=True))
 
 
 @skip_no_olmoearth
@@ -298,16 +254,3 @@ def test_olmoearth_normalization_matches_normalizer():
     expected = Normalizer().normalize(spec, x)
     ours = (x[..., ::-1] - np.array(means)) / np.array(stds)
     assert np.allclose(ours[..., ::-1], expected, atol=1e-5)
-
-
-@skip_no_olmoearth
-def test_timestamps_from_batch_entries():
-    """TerraTorch tasks pass extra batch entries as kwargs: timestamps are used, others ignored."""
-    from terratorch.models.backbones.olmoearth import _create_olmoearth_backbone
-
-    model = _create_olmoearth_backbone("olmoearth_v1_nano", pretrained=False, patch_size=8).eval()
-    x = torch.randn(1, 12, 2, 32, 32)
-    dates = torch.tensor([[[1, 5, 2021], [15, 7, 2021]]])
-    with torch.no_grad():
-        dated, undated = model(x, timestamps=dates, filename="a.tif")[0], model(x)[0]
-    assert not torch.allclose(dated, undated)

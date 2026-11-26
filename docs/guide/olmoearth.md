@@ -68,13 +68,54 @@ the lighter `olmoearth-pretrain-minimal`; both work.
 
 - **Normalization**: OlmoEarth expects raw values (Sentinel-2 L2A digital numbers, Sentinel-1 in dB) mapped from
   `mean ± 2·std` to `[0, 1]` with its pre-training statistics. Inputs standardized with dataset statistics look
-  plausible but do not match. Get datamodule `means` and `stds` that reproduce it:
+  plausible but do not match. These datamodule `means` and `stds` (`mean - 2·std` and `4·std`) reproduce it, in
+  OlmoEarth's band order (the input order without `bands`). For other orders or band subsets, take the lines of
+  your bands in your order.
 
-    ```python
-    from terratorch.models.backbones.olmoearth import olmoearth_normalization
+    === "Sentinel-2 L2A"
 
-    means, stds = olmoearth_normalization({"sentinel2_l2a": ["B04", "B03", "B02", "B08"]})
-    ```
+        ```yaml
+        means:
+          - -2529.4  # B02
+          - -2047.7  # B03
+          - -1968.5  # B04
+          - -469.0  # B08
+          - -1618.5  # B05
+          - -760.5  # B06
+          - -520.9  # B07
+          - -337.1  # B8A
+          - -320.2  # B11
+          - -743.6  # B12
+          - -2795.5  # B01
+          - -2032.4  # B09
+        stds:
+          - 7436.8  # B02
+          - 6911.0  # B03
+          - 6963.1  # B04
+          - 6449.0  # B08
+          - 7018.9  # B05
+          - 6488.5  # B06
+          - 6487.3  # B07
+          - 6445.4  # B8A
+          - 5766.2  # B11
+          - 5315.6  # B12
+          - 7822.8  # B01
+          - 10604.4  # B09
+        ```
+
+    === "Sentinel-1 (dB)"
+
+        ```yaml
+        means:
+          - -33.33  # vv
+          - -38.18  # vh
+        stds:
+          - 43.36  # vv
+          - 40.87  # vh
+        ```
+
+    `olmoearth_normalization` in `terratorch.models.backbones.olmoearth` returns them for any `bands`, e.g.
+    `olmoearth_normalization({"sentinel2_l2a": ["B04", "B03", "B02", "B08"]})`.
 
 - **Dates**: acquisition dates default to zeros. Pass them as `timestamps` `[B, T, 3]` (`[day, month, year]`, months
   0 to 11): add a `timestamps` entry to the batch (TerraTorch tasks pass extra batch entries to the backbone) or to a
