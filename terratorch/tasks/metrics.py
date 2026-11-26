@@ -7,12 +7,32 @@ from torchmetrics import Metric
 class BoundaryMeanIoU(Metric):
     """Boundary mIoU for multiclass segmentation.
 
-    Computes IoU on n-pixel-wide boundary bands of prediction and target for each class,
-    then aggregates (macro/micro). `ignore_index` is ignored in both pred/target.
+    Boundary IoU (Cheng et al., 2021) per class: the IoU of the boundary bands of prediction and target. The band of
+    a class is its pixels that have a pixel of another class within d = ``thickness`` pixels, i.e. whose
+    (2d+1) x (2d+1) neighbourhood is not all that class: a d px deep strip along the inside of each class contour.
+    It is computed as the class mask minus its erosion.
+    Intersections and unions are summed over the dataset, then averaged over classes with a non-empty union (macro)
+    or pooled (micro).
+
+    Differences from the reference implementation (https://github.com/bowenc0221/boundary-iou-api), for tiled
+    remote sensing data:
+
+    - d is fixed in pixels (default 4), not 2 % of the image diagonal: at a fixed ground sample distance this is a
+      fixed ground distance, independent of the tile size.
+    - The image border is not a contour: tile edges are arbitrary cuts, and bands along them would match trivially.
+    - Pixels within d of an ``ignore_index`` target are left out, not only the ignored pixels: contours next to
+      missing labels are artifacts of the missing labels.
 
     Metric based on https://arxiv.org/abs/2103.16562:
     Cheng, B., Girshick, R., Dollár, P., Berg, A. C., & Kirillov, A. (2021). Boundary IoU: Improving object-centric
     image segmentation evaluation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition.
+
+    Args:
+        num_classes: Number of classes.
+        thickness: Band width d in pixels, inside each class region.
+        ignore_index: Target value excluded from the metric.
+        average: ``"macro"`` or ``"micro"``.
+        include_background: Whether class 0 is scored.
     """
 
     full_state_update = False
@@ -20,7 +40,7 @@ class BoundaryMeanIoU(Metric):
     def __init__(
         self,
         num_classes: int,
-        thickness: int = 2,  # boundary band half-width in pixels
+        thickness: int = 4,
         ignore_index: int | None = None,
         average: str = "macro",  # "macro" or "micro"
         include_background: bool = True,
@@ -38,8 +58,15 @@ class BoundaryMeanIoU(Metric):
         self.include_background = include_background
 
         # accumulators across batches
-        self.add_state("intersections", default=torch.zeros(num_classes, dtype=torch.int), dist_reduce_fx="sum")
-        self.add_state("unions", default=torch.zeros(num_classes, dtype=torch.int), dist_reduce_fx="sum")
+        self.add_state("intersections", default=torch.zeros(num_classes, dtype=torch.long), dist_reduce_fx="sum")
+        self.add_state("unions", default=torch.zeros(num_classes, dtype=torch.long), dist_reduce_fx="sum")
+
+    @staticmethod
+    def _inner_band(mask: Tensor, width: int) -> Tensor:
+        """Pixels of a (N, H, W) bool mask within `width` of its contour; the image border is not a contour."""
+        # erosion as a min-pool; max_pool2d pads -x with -inf, so the outside never erodes the mask
+        eroded = -F.max_pool2d(-mask.unsqueeze(1).float(), kernel_size=2 * width + 1, stride=1, padding=width)
+        return mask & (eroded.squeeze(1) < 0.5)
 
     @torch.no_grad()
     def update(self, preds: Tensor, target: Tensor) -> None:
@@ -58,12 +85,13 @@ class BoundaryMeanIoU(Metric):
         if target.dim() != 3:
             raise ValueError("target must be (N,H,W)")
 
-        k = 2 * self.thickness + 1
+        width = self.thickness
 
-        # mask out ignore_index everywhere
-        ignore_mask = torch.zeros_like(target, dtype=torch.bool)
+        # leave out pixels within `width` of an ignored target
+        valid = torch.ones_like(target, dtype=torch.bool)
         if self.ignore_index is not None:
-            ignore_mask = target == self.ignore_index
+            ignored = (target == self.ignore_index).unsqueeze(1).float()
+            valid = F.max_pool2d(ignored, kernel_size=2 * width + 1, stride=1, padding=width).squeeze(1) < 0.5
 
         # optionally skip background class
         start_cls = 0 if self.include_background else 1
@@ -72,30 +100,11 @@ class BoundaryMeanIoU(Metric):
             if self.ignore_index is not None and c == self.ignore_index:
                 continue
 
-            # binary masks for class c
-            pred_c = (preds_idx == c).float().unsqueeze(1)  # (N,1,H,W)
-            target_c = (target == c).float().unsqueeze(1)
+            bnd_pred = self._inner_band(preds_idx == c, width) & valid
+            bnd_target = self._inner_band(target == c, width) & valid
 
-            # compute boundary bands via morphological gradient on binary maps
-            dil_pred = F.max_pool2d(pred_c, kernel_size=k, stride=1, padding=self.thickness)
-            ero_pred = 1.0 - F.max_pool2d(1.0 - pred_c, kernel_size=k, stride=1, padding=self.thickness)
-            bnd_pred = (dil_pred - ero_pred).clamp_min(0.0) > 0.5  # (N,1,H,W) -> bool
-
-            dil_target = F.max_pool2d(target_c, kernel_size=k, stride=1, padding=self.thickness)
-            ero_target = 1.0 - F.max_pool2d(1.0 - target_c, kernel_size=k, stride=1, padding=self.thickness)
-            bnd_target = (dil_target - ero_target).clamp_min(0.0) > 0.5
-
-            # Apply ignore mask
-            bnd_pred = bnd_pred & ~ignore_mask
-            bnd_target = bnd_target & ~ignore_mask
-
-            # IoU on boundary bands
-            inter = (bnd_pred & bnd_target).sum()
-            union = (bnd_pred | bnd_target).sum()
-
-            # Accumulate
-            self.intersections[c] += inter
-            self.unions[c] += union
+            self.intersections[c] += (bnd_pred & bnd_target).sum()
+            self.unions[c] += (bnd_pred | bnd_target).sum()
 
     def compute(self) -> Tensor:
         eps = 1e-9

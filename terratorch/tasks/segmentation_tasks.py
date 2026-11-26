@@ -290,7 +290,6 @@ class SemanticSegmentationTask(TerraTorchTask):
                 ),
                 "Boundary_mIoU": BoundaryMeanIoU(
                     num_classes=num_classes,
-                    thickness=2,
                     ignore_index=ignore_index,
                     average="macro",
                     include_background=False,

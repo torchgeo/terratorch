@@ -20,7 +20,7 @@ class TestBoundaryMeanIoUInitialization:
         metric = BoundaryMeanIoU(num_classes=5)
         
         assert metric.num_classes == 5
-        assert metric.thickness == 2
+        assert metric.thickness == 4
         assert metric.ignore_index is None
         assert metric.average == "macro"
         assert metric.include_background is True
@@ -555,6 +555,23 @@ class TestBoundaryMeanIoUIntegration:
         # State should accumulate
         assert torch.all(intersections2 >= intersections1)
         assert torch.all(unions2 >= unions1)
+
+
+def test_boundary_iou_value():
+    """Hand-computed Boundary IoU: 16 x 16 square touching the left image edge, prediction shifted right by d = 4.
+
+    Bands are 4 px deep inside each square, with no band along the image edge:
+    target band 16 * 16 - 8 * 12 = 160 px, prediction band 16 * 16 - 8 * 8 = 192 px. They overlap only in the top
+    and bottom 4 rows, over columns 4-15: 2 * 4 * 12 = 96 px. IoU = 96 / (160 + 192 - 96) = 0.375.
+    """
+    target = torch.zeros(1, 32, 32, dtype=torch.long)
+    target[:, 8:24, 0:16] = 1
+    preds = torch.zeros_like(target)
+    preds[:, 8:24, 4:20] = 1
+    metric = BoundaryMeanIoU(num_classes=2, include_background=False)
+    metric.update(preds, target)
+    assert metric.intersections[1] == 96 and metric.unions[1] == 256
+    assert metric.compute() == pytest.approx(0.375)
 
 
 if __name__ == "__main__":
