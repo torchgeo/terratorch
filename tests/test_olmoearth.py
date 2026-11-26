@@ -5,7 +5,7 @@
 
 These tests verify that the OlmoEarth backbone can be registered,
 instantiated, and produce the expected output shapes. Tests that require
-the olmoearth-pretrain package are skipped if the package is not installed.
+olmoearth-pretrain (or olmoearth-pretrain-minimal) are skipped if neither is installed.
 """
 
 import gc
@@ -13,17 +13,18 @@ import gc
 import pytest
 import torch
 
-# Check if olmoearth-pretrain is available
+# Check if olmoearth-pretrain (or the lighter olmoearth-pretrain-minimal) is available
 try:
-    import olmoearth_pretrain  # noqa: F401
+    from terratorch.models.backbones.olmoearth import _olmoearth_api
 
+    _olmoearth_api()
     HAS_OLMOEARTH = True
 except ImportError:
     HAS_OLMOEARTH = False
 
 skip_no_olmoearth = pytest.mark.skipif(
     not HAS_OLMOEARTH,
-    reason="olmoearth-pretrain not installed",
+    reason="neither olmoearth-pretrain nor olmoearth-pretrain-minimal installed",
 )
 
 
@@ -47,12 +48,11 @@ class TestOlmoEarthRegistration:
             "olmoearth_v1_2_tiny",
             "olmoearth_v1_2_small",
             "olmoearth_v1_2_base",
+            "olmoearth_v1_3_base",
         ]
 
         for model_name in expected_models:
-            assert model_name in TERRATORCH_BACKBONE_REGISTRY, (
-                f"{model_name} not found in TERRATORCH_BACKBONE_REGISTRY"
-            )
+            assert model_name in TERRATORCH_BACKBONE_REGISTRY, f"{model_name} not found in TERRATORCH_BACKBONE_REGISTRY"
 
     @skip_no_olmoearth
     def test_olmoearth_config_keys(self):
@@ -62,9 +62,7 @@ class TestOlmoEarthRegistration:
         for name, cfg in OLMOEARTH_CONFIGS.items():
             assert "model_id" in cfg, f"Missing model_id in config for {name}"
             assert "embed_dim" in cfg, f"Missing embed_dim in config for {name}"
-            assert isinstance(cfg["embed_dim"], int), (
-                f"embed_dim should be int for {name}"
-            )
+            assert isinstance(cfg["embed_dim"], int), f"embed_dim should be int for {name}"
 
 
 class TestOlmoEarthBackbone:
@@ -82,7 +80,7 @@ class TestOlmoEarthBackbone:
         )
         assert model is not None
         assert model.embed_dim == 128
-        assert model.out_channels == [128]
+        assert model.out_channels == [128] * 4  # one per block of Nano
         gc.collect()
 
     @skip_no_olmoearth
@@ -102,7 +100,7 @@ class TestOlmoEarthBackbone:
         outputs = model(x)
 
         assert isinstance(outputs, list)
-        assert len(outputs) == 1
+        assert len(outputs) == 4  # one per block of Nano
         # With patch_size=8 and input 64x64, expect 8x8 spatial output
         assert outputs[0].shape == (1, 128, 8, 8)
         gc.collect()
@@ -124,9 +122,7 @@ class TestOlmoEarthBackbone:
             outputs = model(x)
             expected_h = h // 8
             expected_w = w // 8
-            assert outputs[0].shape == (1, 128, expected_h, expected_w), (
-                f"Wrong shape for input ({h}, {w})"
-            )
+            assert outputs[0].shape == (1, 128, expected_h, expected_w), f"Wrong shape for input ({h}, {w})"
         gc.collect()
 
     @skip_no_olmoearth
@@ -146,6 +142,68 @@ class TestOlmoEarthBackbone:
 
         with pytest.raises(ValueError, match="Unknown OlmoEarth variant"):
             _create_olmoearth_backbone("olmoearth_v99_mega", pretrained=False)
+
+
+class TestOlmoEarthMultimodalTemporal:
+    """Stacked multi-modal input, time series, temporal pooling and multi-scale outputs."""
+
+    S2 = ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B09", "B11", "B12"]
+
+    @staticmethod
+    def _model(**kwargs):
+        from terratorch.models.backbones.olmoearth import _create_olmoearth_backbone
+
+        return _create_olmoearth_backbone("olmoearth_v1_nano", pretrained=False, patch_size=8, **kwargs).eval()
+
+    @skip_no_olmoearth
+    def test_time_series_mean_and_concat(self):
+        """concat is built through the factory: backbone_temporal_pooling must reach the backbone."""
+        from terratorch.models import EncoderDecoderFactory
+
+        x = torch.randn(1, 12, 3, 32, 32)
+        concat = EncoderDecoderFactory().build_model(
+            task="segmentation", backbone="olmoearth_v1_nano", backbone_pretrained=False, backbone_patch_size=8,
+            backbone_temporal_pooling="concat", backbone_n_timestamps=3, decoder="FCNDecoder", num_classes=2,
+        ).encoder.eval()
+        assert concat.out_channels == [3 * 128] * 4
+        with torch.no_grad():
+            assert self._model()(x)[-1].shape == (1, 128, 4, 4)
+            assert concat(x)[-1].shape == (1, 3 * 128, 4, 4)
+            for t in (2, 1):  # T=1 imagery is not repeated over time, only e.g. srtm
+                with pytest.raises(ValueError, match="time steps"):
+                    concat(x[:, :, :t])
+
+    @skip_no_olmoearth
+    def test_multimodal_bands(self):
+        """A stacked S2 + S1 tensor equals the native per-modality dict; modality concat keeps both."""
+        from terratorch.models.backbones.olmoearth import _olmoearth_api
+
+        bands = {"sentinel2_l2a": self.S2, "sentinel1": ["vv", "vh"]}
+        mean, concat = self._model(bands=bands), self._model(bands=bands, modality_pooling="concat")
+        concat.load_state_dict(mean.state_dict())
+        x = torch.randn(1, 14, 32, 32)
+        order = [self.S2.index(b) for b in _olmoearth_api().Modality.get("sentinel2_l2a").band_order]
+        with torch.no_grad():
+            m, c = mean(x)[-1], concat(x)[-1]
+            assert torch.allclose(m, mean({"sentinel2_l2a": x[:, order], "sentinel1": x[:, 12:]})[-1])
+        assert concat.out_channels == [2 * 128] * 4 and c.shape == (1, 256, 4, 4)
+        assert torch.allclose(m, (c[:, :128] + c[:, 128:]) / 2, atol=1e-6)
+
+    @skip_no_olmoearth
+    def test_band_subset_masks_missing_band_sets(self):
+        """RGBN fills Sentinel-2's first band set; the other two are masked as missing and removed from attention."""
+        rgbn = ["B04", "B03", "B02", "B08"]
+        model = self._model(bands={"sentinel2_l2a": rgbn}).train()
+        assert model.missing_band_sets == {"sentinel2_l2a": [1, 2]}
+        x = torch.randn(2, 4, 32, 32)
+        torch.manual_seed(0)
+        out = model(x)[-1]
+        assert out.shape == (2, 128, 4, 4)
+        # skipping the all-True attention mask is exact: same as the encoder's own masked path
+        model.encoder._maybe_get_attn_mask = type(model.encoder)._maybe_get_attn_mask.__get__(model.encoder)
+        torch.manual_seed(0)
+        assert torch.allclose(out, model(x)[-1], atol=1e-5)
+
 
 
 class TestOlmoEarthImportGuard:
