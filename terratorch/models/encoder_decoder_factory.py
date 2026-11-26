@@ -1,7 +1,6 @@
 # Copyright contributors to the Terratorch project
 
 import inspect
-import logging
 import warnings
 from typing import List
 
@@ -59,17 +58,12 @@ def _get_decoder_and_head_kwargs(
 
         return decoder, head_kwargs, False
 
-    # if its not an nn module, check if the class includes a head
-    # depending on that, pass num classes/num outputs to either head kwrags or decoder
-    if hasattr(DECODER_REGISTRY.find_class(decoder), "includes_head"):
-        includes_head = DECODER_REGISTRY.find_registry(decoder).includes_head
-
-    else:
-        includes_head = False
-        msg = (
-            f"Decoder {decoder} does not have an `includes_head` attribute. Falling back to the value of the registry."
-        )
-        logging.debug(msg)
+    decoder_class = DECODER_REGISTRY.find_class(decoder)
+    includes_head = getattr(
+        decoder_class,
+        "includes_head",
+        DECODER_REGISTRY.find_registry(decoder).includes_head,
+    )
 
     key = "num_outputs" if num_outputs is not None else "num_classes"
     num_outputs = num_outputs or num_classes
