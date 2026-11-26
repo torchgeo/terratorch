@@ -16,8 +16,8 @@ def test_mean_averages_time_steps():
     assert torch.allclose(out[0], torch.full((B, C, H, H), 1.5))
 
 
-def test_linear_is_weighted_sum():
-    neck = TemporalPooling([C * T], n_timestamps=T, pooling="linear")
+def test_weighted_sum():
+    neck = TemporalPooling([C * T], n_timestamps=T, pooling="weighted")
     assert sum(p.numel() for p in neck.parameters()) == T + 1
     x = torch.cat([torch.full((B, C, H, H), float(t)) for t in range(T)], dim=1)
     w, b = neck.tmap[0].weight[0].detach(), neck.tmap[0].bias.detach()
@@ -35,8 +35,8 @@ def test_rejects_indivisible_channels():
         TemporalPooling([C * T + 1], n_timestamps=T)
 
 
-def test_conv_merges_time_and_channels():
-    neck = TemporalPooling([C * T, 2 * C * T], n_timestamps=T, pooling="conv")
+def test_project_merges_time_and_channels():
+    neck = TemporalPooling([C * T, 2 * C * T], n_timestamps=T, pooling="project")
     assert sum(p.numel() for p in neck.parameters()) == (C * T * C + C) + (2 * C * T * 2 * C + 2 * C)
     out = neck([torch.randn(B, C * T, H, H), torch.randn(B, 2 * C * T, H, H)])
     assert [o.shape for o in out] == [(B, C, H, H), (B, 2 * C, H, H)]
@@ -65,12 +65,12 @@ def test_token_dim():
     tokens = torch.randn(B, 16, T * C)
     out = TemporalPooling([C * T], T, "mean", dim=2)([tokens])[0]
     assert torch.allclose(out, tokens.unflatten(2, (T, C)).mean(dim=2))
-    assert TemporalPooling([C * T], T, "linear", dim=-1)([tokens])[0].shape == (B, 16, C)
+    assert TemporalPooling([C * T], T, "weighted", dim=-1)([tokens])[0].shape == (B, 16, C)
     with pytest.raises(ValueError, match="dim=1"):
-        TemporalPooling([C * T], T, "conv", dim=2)
+        TemporalPooling([C * T], T, "project", dim=2)
 
 
-@pytest.mark.parametrize("pooling", ["linear", "conv"])
+@pytest.mark.parametrize("pooling", ["weighted", "project"])
 def test_temporal_wrapper_learned_pooling_matches_neck(pooling):
     """TemporalWrapper(pooling) == TemporalWrapper(concat) + TemporalPooling neck, same weights."""
     from terratorch.models.utils import TemporalWrapper
@@ -95,7 +95,7 @@ def test_freeze_backbone_keeps_temporal_pooling_trainable():
         backbone_pretrained=False,
         backbone_modalities=["S2L2A"],
         backbone_use_temporal=True,
-        backbone_temporal_pooling="linear",
+        backbone_temporal_pooling="weighted",
         backbone_temporal_n_timestamps=T,
         necks=[{"name": "ReshapeTokensToImage"}],
         decoder="FCNDecoder",

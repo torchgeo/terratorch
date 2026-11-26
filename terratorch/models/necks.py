@@ -403,7 +403,7 @@ class TemporalPooling(Neck):
         effective_time_dim: 4
       - name: TemporalPooling
         n_timestamps: 4
-        pooling: linear
+        pooling: weighted
     ```
 
     Args:
@@ -412,9 +412,9 @@ class TemporalPooling(Neck):
         pooling: How the time steps are merged, per feature:
             "mean" / "max": average / maximum over time.
             "diff": first minus second time step; needs exactly two (after ``subset_lengths``).
-            "linear": learned weighted sum over time, ``nn.Linear(T, 1)`` shared across channels
+            "weighted": learned weighted sum over time, ``nn.Linear(T, 1)`` shared across channels
             (T + 1 parameters), like ``multi_temporal_strategy: linear`` in PANGAEA-bench.
-            "conv": learned merge of all time steps and channels, a 1x1 ``nn.Conv2d(T*C, C)``
+            "project": learned projection of all time steps and channels, a 1x1 ``nn.Conv2d(T*C, C)``
             (T*C*C + C parameters). Needs ``dim=1``.
             "concat" / "keep": no pooling, the features are returned unchanged.
         dim: Dimension along which the time steps are concatenated.
@@ -422,7 +422,7 @@ class TemporalPooling(Neck):
             2 and the last 3), then pool over the group means.
     """
 
-    POOLINGS = ("mean", "max", "diff", "linear", "conv", "concat", "keep")
+    POOLINGS = ("mean", "max", "diff", "weighted", "project", "concat", "keep")
 
     def __init__(
         self,
@@ -461,16 +461,16 @@ class TemporalPooling(Neck):
         ):
             msg = f"channel_list={channel_list} is not divisible by n_timestamps={n_timestamps}"
             raise ValueError(msg)
-        if pooling in ("linear", "conv"):
+        if pooling in ("weighted", "project"):
             if n_timestamps is None:
                 msg = f"'{pooling}' pooling needs n_timestamps"
                 raise ValueError(msg)
             n = len(subset_lengths) if subset_lengths else n_timestamps
-            if pooling == "linear":
+            if pooling == "weighted":
                 self.tmap = nn.ModuleList([nn.Linear(n, 1) for _ in channel_list])
             else:
                 if dim != 1:
-                    msg = f"'conv' pooling needs dim=1, got dim={dim}"
+                    msg = f"'project' pooling needs dim=1, got dim={dim}"
                     raise ValueError(msg)
                 self.tmap = nn.ModuleList(
                     [nn.Conv2d(n * (c // n_timestamps), c // n_timestamps, 1) for c in channel_list]
@@ -485,9 +485,9 @@ class TemporalPooling(Neck):
             x = torch.stack([subset.mean(dim=dim) for subset in x.split(self.subset_lengths, dim=dim)], dim=dim)
         if self.pooling == "keep":
             return x
-        if self.pooling in ("concat", "conv"):
+        if self.pooling in ("concat", "project"):
             x = x.flatten(dim, dim + 1)
-            return self.tmap[level](x) if self.pooling == "conv" else x
+            return self.tmap[level](x) if self.pooling == "project" else x
         if self.pooling == "mean":
             return x.mean(dim=dim)
         if self.pooling == "max":

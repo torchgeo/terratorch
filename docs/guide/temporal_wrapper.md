@@ -26,10 +26,10 @@ Select the temporal aggregation with the `pooling` parameter:
 - `"mean"`: Average features across timesteps.  
 - `"max"`: Element-wise maximum across timesteps. 
 - `"diff"`: Compute the difference between two temporal elements, eg two timesteps (`t0 − t1`). If `subset_lengths` is provided, difference is computed between means of the defined subsets. 
-- `"linear"`: Learned weighted sum over time, `nn.Linear(T, 1)` shared across channels (T + 1 parameters per layer). Additional `n_timestamps` required.
-- `"conv"`: Learned merge of all timesteps and channels, a 1x1 `Conv2d(T*C, C)` (T·C² + C parameters per layer). Additional `n_timestamps` required.
+- `"weighted"`: Learned weighted sum over time, `nn.Linear(T, 1)` shared across channels (T + 1 parameters per layer). Additional `n_timestamps` required.
+- `"project"`: Learned projection of all timesteps and channels, a 1x1 `Conv2d(T*C, C)` (T·C² + C parameters per layer). Additional `n_timestamps` required.
 
-`linear` and `conv` stay trainable with `freeze_backbone`.
+`weighted` and `project` stay trainable with `freeze_backbone`.
 
 !!! warning
     TerraTorch necks and decoders expect 4D inputs. Use a temporal aggregation that returns 4D (`mean`, `max`, `diff` or `concat`) for TerraTorch fine-tunings.
@@ -151,7 +151,7 @@ pooling modes and `subset_lengths`; `dim` (default 1) sets the concatenated dime
           effective_time_dim: 4  # -> [B, 4 * D, H', W']
         - name: TemporalPooling
           n_timestamps: 4
-          pooling: linear  # -> [B, D, H', W']
+          pooling: weighted  # -> [B, D, H', W']
         - name: LearnedInterpolateToPyramidal
       decoder: UNetDecoder
       ...
@@ -166,7 +166,7 @@ pooling modes and `subset_lengths`; `dim` (default 1) sets the concatenated dime
         "necks": [
             {"name": "SelectIndices", "indices": [5, 11, 17, 23]},
             {"name": "ReshapeTokensToImage", "effective_time_dim": 4},
-            {"name": "TemporalPooling", "n_timestamps": 4, "pooling": "linear"},
+            {"name": "TemporalPooling", "n_timestamps": 4, "pooling": "weighted"},
             {"name": "LearnedInterpolateToPyramidal"},
         ],
         "decoder": "UNetDecoder",

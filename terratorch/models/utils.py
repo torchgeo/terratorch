@@ -188,7 +188,7 @@ class TemporalWrapper(nn.Module):
 
         Args:
             encoder (nn.Module): The feature extractor (backbone).
-            pooling (str): Type of pooling ('keep', 'concat', 'mean', 'max', 'diff', 'linear', 'conv'), see\n                ``terratorch.models.necks.TemporalPooling``. 'diff' requires exactly two temporal elements after optional\n                subset aggregation; 'linear' and 'conv' are learned and need ``n_timestamps``;
+            pooling (str): Type of pooling ('keep', 'concat', 'mean', 'max', 'diff', 'weighted', 'project'), see\n                ``terratorch.models.necks.TemporalPooling``. 'diff' requires exactly two temporal elements after optional\n                subset aggregation; 'weighted' and 'project' are learned and need ``n_timestamps``;
                 they stay trainable with ``freeze_backbone`` (see ``freeze``).
             concat (bool): Deprecated - 'concat' now integrated as pooling option.
             n_timestamps (int): Used to compute backbone out_channels when constructing encoder–decoder pipelines in case of 'concat' pooling.
@@ -211,7 +211,7 @@ class TemporalWrapper(nn.Module):
         from terratorch.models.necks import TemporalPooling
 
         # Learned poolings need the encoder's channels per time step to size their weights.
-        learned = pooling in ("linear", "conv")
+        learned = pooling in ("weighted", "project")
         if learned and not (hasattr(encoder, "out_channels") and n_timestamps):
             msg = f"'{pooling}' pooling needs n_timestamps and an encoder with out_channels."
             raise ValueError(msg)
@@ -250,7 +250,7 @@ class TemporalWrapper(nn.Module):
                 self.out_channels = encoder.out_channels
 
     def freeze(self) -> None:
-        """Freeze the wrapped encoder only. The learned temporal pooling ('linear', 'conv') stays trainable,
+        """Freeze the wrapped encoder only. The learned temporal pooling ('weighted', 'project') stays trainable,
         like a neck, so ``freeze_backbone`` trains it on top of a frozen encoder."""
         if hasattr(self.encoder, "freeze"):
             self.encoder.freeze()
