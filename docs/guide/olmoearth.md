@@ -58,6 +58,9 @@ the lighter `olmoearth-pretrain-minimal`; both work.
 - Output: feature maps `[B, D, H / patch_size, W / patch_size]`, averaged over band sets and modalities.
   `modality_pooling: concat` stacks the modalities instead (`[B, n_modalities * D, ...]`).
 - `temporal_pooling`: `mean` (default) or `concat` (time stacked into channels, needs `n_timestamps`).
+- `patch_size` (default 8, the base patch size) can be any size with the pre-trained weights: OlmoEarth resizes the
+  input so that one 8 px patch covers `patch_size` pixels, FlexiViT-style. This is what `backbone_patch_resize`
+  does, so set `backbone_patch_size` directly instead.
 - `fast_pass` (default `True`) skips the attention mask, which otherwise runs out of memory at small patch sizes.
 - Do not use `backbone_use_temporal`: OlmoEarth encodes the time series itself.
 
