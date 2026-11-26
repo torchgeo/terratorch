@@ -21,4 +21,6 @@ Necks reshape the output of an encoder into a format suitable for the decoder. B
 
 :::terratorch.models.necks.AddBottleneckLayer
 
+:::terratorch.models.necks.TemporalPooling
+
 

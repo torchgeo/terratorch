@@ -26,6 +26,10 @@ Select the temporal aggregation with the `pooling` parameter:
 - `"mean"`: Average features across timesteps.  
 - `"max"`: Element-wise maximum across timesteps. 
 - `"diff"`: Compute the difference between two temporal elements, eg two timesteps (`t0 − t1`). If `subset_lengths` is provided, difference is computed between means of the defined subsets. 
+- `"weighted"`: Learned weighted sum over time, `nn.Linear(T, 1)` shared across channels (T + 1 parameters per layer). Additional `n_timestamps` required.
+- `"project"`: Learned projection of all timesteps and channels, a 1x1 `Conv2d(T*C, C)` (T·C² + C parameters per layer). Additional `n_timestamps` required.
+
+`weighted` and `project` stay trainable with `freeze_backbone`.
 
 !!! warning
     TerraTorch necks and decoders expect 4D inputs. Use a temporal aggregation that returns 4D (`mean`, `max`, `diff` or `concat`) for TerraTorch fine-tunings.
@@ -128,6 +132,44 @@ Use the wrapped model wherever a backbone is expected (e.g., in TerraTorch tasks
     temporal_backbone = TemporalWrapper(backbone, pooling="concat", n_timestamps=6)
     ```
 
----
+## TemporalPooling neck
 
-Example notebook:: [TemporalWrapper.ipynb](https://github.com/IBM/terratorch/blob/main/examples/notebooks/TemporalWrapper.ipynb)
+Pools features with the timesteps concatenated in channels, `[B, T*C, H, W]` -> `[B, C, H, W]`, e.g. from Prithvi
+(`ReshapeTokensToImage` with `effective_time_dim`) or a TemporalWrapper with `pooling: concat`. It supports the same
+pooling modes and `subset_lengths`; `dim` (default 1) sets the concatenated dimension.
+
+=== "YAML"
+    ```yaml
+    model_args:
+      backbone: prithvi_eo_v2_300_tl
+      backbone_pretrained: True
+      backbone_num_frames: 4
+      necks:
+        - name: SelectIndices
+          indices: [5, 11, 17, 23]
+        - name: ReshapeTokensToImage
+          effective_time_dim: 4  # -> [B, 4 * D, H', W']
+        - name: TemporalPooling
+          n_timestamps: 4
+          pooling: weighted  # -> [B, D, H', W']
+        - name: LearnedInterpolateToPyramidal
+      decoder: UNetDecoder
+      ...
+    ```
+
+=== "Python"
+    ```python
+    model_args={
+        "backbone": "prithvi_eo_v2_300_tl",
+        "backbone_pretrained": True,
+        "backbone_num_frames": 4,
+        "necks": [
+            {"name": "SelectIndices", "indices": [5, 11, 17, 23]},
+            {"name": "ReshapeTokensToImage", "effective_time_dim": 4},
+            {"name": "TemporalPooling", "n_timestamps": 4, "pooling": "weighted"},
+            {"name": "LearnedInterpolateToPyramidal"},
+        ],
+        "decoder": "UNetDecoder",
+        ...
+    }
+    ```
