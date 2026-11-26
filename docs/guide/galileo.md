@@ -17,10 +17,12 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
       backbone_pretrained: True
       backbone_patch_size: 8
       backbone_bands: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B11, B12, VV, VH, elevation]
-      backbone_out_indices: [2, 5, 8, 11]  # for hierarchical decoders
-      necks:
+      necks:  # recommended for UNetDecoder: four evenly spaced blocks -> 4-level pyramid
+        - name: SelectIndices
+          indices: [2, 5, 8, 11]  # of the 12 blocks of tiny and base
         - name: LearnedInterpolateToPyramidal
       decoder: UNetDecoder
+      decoder_channels: [256, 128, 64, 32]
       ...
     ```
 
@@ -31,9 +33,12 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
         "backbone_pretrained": True,
         "backbone_patch_size": 8,
         "backbone_bands": ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B9", "B11", "B12", "VV", "VH", "elevation"],
-        "backbone_out_indices": [2, 5, 8, 11],
-        "necks": [{"name": "LearnedInterpolateToPyramidal"}],
+        "necks": [  # recommended for UNetDecoder: four evenly spaced blocks -> 4-level pyramid
+            {"name": "SelectIndices", "indices": [2, 5, 8, 11]},  # of the 12 blocks of tiny and base
+            {"name": "LearnedInterpolateToPyramidal"},
+        ],
         "decoder": "UNetDecoder",
+        "decoder_channels": [256, 128, 64, 32],
         ...
     }
     ```
@@ -42,7 +47,8 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
   they are sorted into Galileo's input families (e.g. `elevation` into the space family). Bands without a slot (here
   `B1`, `B9`) are ignored, missing band groups are masked. With `B4` and `B8`, NDVI is computed
   (`compute_ndvi`, default `True`). Without `bands`, the input holds Galileo's 13 space-time bands in order.
-- Output: feature maps `[B, D, H / patch_size, W / patch_size]`, averaged over band groups.
+- Output: one feature map `[B, D, H / patch_size, W / patch_size]` per encoder block (the last is the final
+  encoder output), averaged over the observed band groups. Pick blocks with `SelectIndices`.
 - `patch_size` (default 4) can be any size with the pre-trained weights: the 8 px patch embeddings are resized to it
   FlexiViT-style (pseudo-inverse resize of the kernel). So set `backbone_patch_size` directly; `backbone_patch_resize`
   is not needed.

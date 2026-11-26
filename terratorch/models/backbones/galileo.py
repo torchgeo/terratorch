@@ -32,7 +32,6 @@ import logging
 import math
 import warnings
 from collections import OrderedDict
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from typing import OrderedDict as OrderedDictType
@@ -128,8 +127,6 @@ class GalileoBackbone(nn.Module):
         temporal_pooling: "mean" averages the time steps (default). "concat" stacks them into
             channels, giving (B, n_timestamps * D, H', W').
         n_timestamps: Number of time steps, required for "concat".
-        out_indices: Encoder blocks whose outputs are returned, for multi-scale decoders.
-            Defaults to the final encoder output only.
         compute_ndvi: If ``bands`` has B4 and B8 but no NDVI, compute NDVI from them, as Galileo always saw it in
             pre-training. Assumes inputs normalized as in ``galileo_normalization``; negative reflectances are
             clamped to 0.
@@ -142,7 +139,6 @@ class GalileoBackbone(nn.Module):
         bands: list[str] | None = None,
         temporal_pooling: str = "mean",
         n_timestamps: int = 1,
-        out_indices: list[int] | None = None,
         compute_ndvi: bool = True,
     ) -> None:
         super().__init__()
@@ -181,27 +177,18 @@ class GalileoBackbone(nn.Module):
                 for family, groups in (("space_time", SPACE_TIME_BANDS_GROUPS_IDX), ("space", SPACE_BAND_GROUPS_IDX))
             }
 
-        self.out_indices = None
-        if out_indices:
-            depth = len(encoder.blocks)
-            if any(i < -depth or i >= depth for i in out_indices):
-                msg = f"out_indices must be between {-depth} and {depth - 1}, got {out_indices}"
-                raise ValueError(msg)
-            self.out_indices = [i % depth for i in out_indices]
-            self._captured: dict[int, Tensor] = {}
-            for i in set(self.out_indices):
-                encoder.blocks[i].register_forward_hook(self._capture_hook(i))
-
-    def _capture_hook(self, idx: int) -> Callable:
-        def hook(_module, _inputs, output):
-            self._captured[idx] = output[0] if isinstance(output, tuple) else output
-
-        return hook
+        # Return every block's output, like TerraMind and Prithvi (pick with SelectIndices); the last is the
+        # encoder's final output.
+        self._captured: list[Tensor] = []
+        for block in encoder.blocks:
+            block.register_forward_hook(
+                lambda _module, _inputs, out: self._captured.append(out[0] if isinstance(out, tuple) else out)
+            )
 
     @property
     def out_channels(self) -> list[int]:
         channels = self.embed_dim * (self.n_timestamps if self.temporal_pooling == "concat" else 1)
-        return [channels] * (len(self.out_indices) if self.out_indices else 1)
+        return [channels] * len(self.encoder.blocks)
 
     def forward(self, x: Tensor | dict[str, Tensor], months: Tensor | None = None, **kwargs: object) -> list[Tensor]:
         """
@@ -267,9 +254,6 @@ class GalileoBackbone(nn.Module):
             x.permute(0, 3, 4, 2, 1), sp_x, t_x, st_x, s_t_m, sp_m, t_m, st_m, months, patch_size=self.patch_size
         )
         # out[0]: space-time tokens (B, H', W', T, band_groups, D)
-        if not self.out_indices:
-            return [self._to_feature_map(out[0], out[4])]
-
         # Block outputs are the pruned token sequence: the encoder drops masked tokens with a stable
         # sort before the blocks and restores them after the last one. Undo the same sort to put each
         # block's tokens back on the grid, then keep the space-time part. out[4:8] are the token masks.
@@ -277,8 +261,7 @@ class GalileoBackbone(nn.Module):
         n_space_time = grid.numel()
         masks = torch.cat([m.flatten(1) for m in out[4:8]], dim=1)
         order = torch.sort((masks == 0).int(), dim=1, descending=True, stable=True)[1]
-        captured = [self._captured[i] for i in self.out_indices]
-        self._captured = {}
+        captured, self._captured = self._captured[:-1], []  # the last block is replaced by the final output
         return [
             self._to_feature_map(
                 torch.zeros(B, masks.shape[1], self.embed_dim, dtype=block.dtype, device=device)
@@ -287,7 +270,7 @@ class GalileoBackbone(nn.Module):
                 out[4],
             )
             for block in captured
-        ]
+        ] + [self._to_feature_map(out[0], out[4])]
 
     @staticmethod
     def _ndvi(b4: Tensor, b8: Tensor) -> Tensor:
@@ -322,7 +305,7 @@ def _create_galileo_backbone(size: str, pretrained: bool = False, **kwargs) -> G
         encoder = Encoder.load_from_folder(Path(files[0]).parent, device=torch.device("cpu"))
     else:
         encoder = Encoder(**COMMON_CONFIG, **GALILEO_CONFIGS[size])
-    wrapper_args = ("patch_size", "bands", "temporal_pooling", "n_timestamps", "out_indices", "compute_ndvi")
+    wrapper_args = ("patch_size", "bands", "temporal_pooling", "n_timestamps", "compute_ndvi")
     return GalileoBackbone(encoder, **{k: v for k, v in kwargs.items() if k in wrapper_args})
 
 
