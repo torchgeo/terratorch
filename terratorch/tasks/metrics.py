@@ -1,5 +1,3 @@
-import math
-
 import torch
 import torch.nn.functional as F
 from torch import Tensor
@@ -10,9 +8,11 @@ class BoundaryMeanIoU(Metric):
     """Boundary mIoU for multiclass segmentation.
 
     Boundary IoU (Cheng et al., 2021) of each class: the IoU of the inner contour bands of prediction and target,
-    i.e. the class pixels within distance d of the class contour, where the image border counts as a contour. As in
-    the reference implementation (https://github.com/bowenc0221/boundary-iou-api), d defaults to 2 % of the image
-    diagonal (``dilation_ratio=0.02``) and the band is the mask minus its erosion by a (2d+1) x (2d+1) square.
+    i.e. the class pixels within d = ``thickness`` pixels of the class contour, where the image border counts as a
+    contour. As in the reference implementation (https://github.com/bowenc0221/boundary-iou-api), the band is the
+    mask minus its erosion by a (2d+1) x (2d+1) square. Unlike the reference, which sets d to 2 % of the image
+    diagonal, d is fixed in pixels (default 4): at a fixed ground sample distance this is a fixed distance on the
+    ground, independent of the tile size.
     Intersections and unions are accumulated over the dataset, then averaged over classes with a non-empty union
     (macro) or pooled (micro). Pixels within d of an ``ignore_index`` target are left out, since their contours
     depend on the missing labels.
@@ -23,8 +23,7 @@ class BoundaryMeanIoU(Metric):
 
     Args:
         num_classes: Number of classes.
-        thickness: Fixed band width d in pixels. ``None`` (default) derives it from ``dilation_ratio``.
-        dilation_ratio: Band width as a fraction of the image diagonal (paper default 0.02), used without ``thickness``.
+        thickness: Band width d in pixels, inside each class region.
         ignore_index: Target value excluded from the metric.
         average: ``"macro"`` or ``"micro"``.
         include_background: Whether class 0 is scored.
@@ -35,8 +34,7 @@ class BoundaryMeanIoU(Metric):
     def __init__(
         self,
         num_classes: int,
-        thickness: int | None = None,
-        dilation_ratio: float = 0.02,
+        thickness: int = 4,
         ignore_index: int | None = None,
         average: str = "macro",  # "macro" or "micro"
         include_background: bool = True,
@@ -49,7 +47,6 @@ class BoundaryMeanIoU(Metric):
 
         self.num_classes = num_classes
         self.thickness = thickness
-        self.dilation_ratio = dilation_ratio
         self.ignore_index = ignore_index
         self.average = average
         self.include_background = include_background
@@ -82,7 +79,7 @@ class BoundaryMeanIoU(Metric):
         if target.dim() != 3:
             raise ValueError("target must be (N,H,W)")
 
-        width = self.thickness or max(1, int(round(self.dilation_ratio * math.hypot(*target.shape[-2:]))))
+        width = self.thickness
 
         # leave out pixels within `width` of an ignored target
         valid = torch.ones_like(target, dtype=torch.bool)

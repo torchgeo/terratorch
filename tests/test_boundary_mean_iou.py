@@ -21,8 +21,7 @@ class TestBoundaryMeanIoUInitialization:
         metric = BoundaryMeanIoU(num_classes=5)
         
         assert metric.num_classes == 5
-        assert metric.thickness is None
-        assert metric.dilation_ratio == 0.02
+        assert metric.thickness == 4
         assert metric.ignore_index is None
         assert metric.average == "macro"
         assert metric.include_background is True
@@ -563,11 +562,11 @@ if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
 
-def _reference_boundary(mask, dilation_ratio=0.02):
-    """numpy port of mask_to_boundary from the Boundary IoU reference code (bowenc0221/boundary-iou-api):
-    zero-pad by 1, erode with a 3x3 kernel `d` times (cv2 border: no erosion from outside), mask minus erosion."""
+def _reference_boundary(mask, d):
+    """numpy port of mask_to_boundary from the Boundary IoU reference code (bowenc0221/boundary-iou-api), with the
+    band width d given directly instead of as 2 % of the diagonal: zero-pad by 1, erode with a 3x3 kernel d times
+    (cv2 border: no erosion from outside), mask minus erosion."""
     h, w = mask.shape
-    d = max(1, int(round(dilation_ratio * np.sqrt(h**2 + w**2))))
     e = np.pad(mask.astype(np.uint8), 1)
     for _ in range(d):
         p = np.pad(e, 1, constant_values=1)
@@ -578,14 +577,12 @@ def _reference_boundary(mask, dilation_ratio=0.02):
 class TestBoundaryMeanIoUDefinition:
     """BoundaryMeanIoU follows the definition of Cheng et al. (2021) and its reference implementation."""
 
-    @pytest.mark.parametrize("size", [(64, 64), (100, 60), (512, 512)])
-    def test_band_matches_reference(self, size):
+    @pytest.mark.parametrize(("size", "width"), [((64, 64), 1), ((100, 60), 4), ((512, 512), 14)])
+    def test_band_matches_reference(self, size, width):
         g = torch.Generator().manual_seed(0)
         mask = torch.nn.functional.interpolate(torch.rand(1, 1, 8, 8, generator=g), size=size)[0, 0] > 0.5
-        h, w = size
-        width = max(1, int(round(0.02 * np.hypot(h, w))))
         band = BoundaryMeanIoU._inner_band(mask[None], width)[0].numpy()
-        np.testing.assert_array_equal(band, _reference_boundary(mask.numpy()))
+        np.testing.assert_array_equal(band, _reference_boundary(mask.numpy(), width))
 
     def test_iou_matches_reference(self):
         g = torch.Generator().manual_seed(1)
@@ -596,25 +593,25 @@ class TestBoundaryMeanIoUDefinition:
         metric.update(preds, target)
         ious = []
         for c in range(3):
-            bp = np.stack([_reference_boundary((p == c).numpy()) for p in preds])
-            bt = np.stack([_reference_boundary((t == c).numpy()) for t in target])
+            bp = np.stack([_reference_boundary((p == c).numpy(), 4) for p in preds])
+            bt = np.stack([_reference_boundary((t == c).numpy(), 4) for t in target])
             ious.append((bp & bt).sum() / (bp | bt).sum())
         assert metric.compute().item() == pytest.approx(np.mean(ious), abs=1e-6)
 
-    def test_band_width_scales_with_image(self):
-        target = torch.zeros(1, 512, 512, dtype=torch.long)
-        target[:, 128:384, 128:384] = 1
+    @pytest.mark.parametrize("size", [64, 512])
+    def test_default_band_width_is_4px_at_any_size(self, size):
+        target = torch.zeros(1, size, size, dtype=torch.long)
+        target[:, 16:48, 16:48] = 1
         metric = BoundaryMeanIoU(num_classes=2, include_background=False)
         metric.update(target, target)
-        d = round(0.02 * np.hypot(512, 512))  # 14 px
-        assert metric.unions[1] == 256**2 - (256 - 2 * d) ** 2
+        assert metric.unions[1] == 32**2 - 24**2
 
     def test_inner_band_only(self):
         """A prediction grown by d outside the object still covers the whole target band, but its own band lies
         outside the target: Boundary IoU 0 for the object class."""
         target = torch.zeros(1, 64, 64, dtype=torch.long)
         target[:, 20:44, 20:44] = 1
-        d = round(0.02 * np.hypot(64, 64))  # 2 px
+        d = 4
         preds = torch.zeros_like(target)
         preds[:, 20 - d : 44 + d, 20 - d : 44 + d] = 1
         metric = BoundaryMeanIoU(num_classes=2, include_background=False)
