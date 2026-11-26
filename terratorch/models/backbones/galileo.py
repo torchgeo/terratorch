@@ -123,7 +123,7 @@ class GalileoBackbone(nn.Module):
     Args:
         encoder: Galileo ``Encoder``.
         patch_size: Patch size for tokenization. Patch sizes other than the base one (8) are handled by
-            resizing the input, FlexiViT-style.
+            resizing the patch embedding weights, FlexiViT-style.
         bands: Names of the input channels, see above. Galileo band names, case-insensitive.
         temporal_pooling: "mean" averages the time steps (default). "concat" stacks them into
             channels, giving (B, n_timestamps * D, H', W').

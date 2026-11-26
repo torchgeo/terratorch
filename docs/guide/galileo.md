@@ -43,6 +43,9 @@ multi-temporal foundation model by NASA Harvest. The encoder is included in Terr
   `B1`, `B9`) are ignored, missing band groups are masked. With `B4` and `B8`, NDVI is computed
   (`compute_ndvi`, default `True`). Without `bands`, the input holds Galileo's 13 space-time bands in order.
 - Output: feature maps `[B, D, H / patch_size, W / patch_size]`, averaged over band groups.
+- `patch_size` (default 4) can be any size with the pre-trained weights: the 8 px patch embeddings are resized to it
+  FlexiViT-style (pseudo-inverse resize of the kernel). So set `backbone_patch_size` directly; `backbone_patch_resize`
+  is not needed.
 - `temporal_pooling`: `mean` (default) or `concat` (time stacked into channels, needs `n_timestamps`).
 - Do not use `backbone_use_temporal`: Galileo encodes the time series itself.
 
