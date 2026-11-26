@@ -13,34 +13,77 @@ Weights are downloaded from [Meta](https://ai.meta.com/resources/models-and-libr
 
 ## Usage
 
-=== "YAML"
-    ```yaml
-    model_args:
-      backbone: dinov3_convnext_tiny
-      backbone_ckpt_path: path/to/dinov3_convnext_tiny_pretrain_lvd1689m.pth
-      backbone_bands: [B2, B3, B4, B8, B11, B12]  # optional, default RGB
-      necks:
-        - name: ReshapeTokensToImage
-      decoder: UNetDecoder
-      ...
-    ```
+=== "ConvNeXt"
 
-=== "Python"
-    ```python
-    model_args = {
-        "backbone": "dinov3_convnext_tiny",
-        "backbone_ckpt_path": "path/to/dinov3_convnext_tiny_pretrain_lvd1689m.pth",
-        "backbone_bands": ["B2", "B3", "B4", "B8", "B11", "B12"],  # optional, default RGB
-        "necks": [{"name": "ReshapeTokensToImage"}],
-        "decoder": "UNetDecoder",
-        ...
-    }
-    ```
+    ConvNeXts are hierarchical (4 stages, strides 4 to 32), so the stage outputs go to the UNet decoder directly.
+
+    === "YAML"
+        ```yaml
+        model_args:
+          backbone: dinov3_convnext_tiny
+          backbone_ckpt_path: path/to/dinov3_convnext_tiny_pretrain_lvd1689m.pth
+          backbone_bands: [B2, B3, B4, B8, B11, B12]  # optional, default RGB
+          necks:
+            - name: ReshapeTokensToImage
+          decoder: UNetDecoder
+          decoder_channels: [256, 128, 64, 32]
+          ...
+        ```
+
+    === "Python"
+        ```python
+        model_args = {
+            "backbone": "dinov3_convnext_tiny",
+            "backbone_ckpt_path": "path/to/dinov3_convnext_tiny_pretrain_lvd1689m.pth",
+            "backbone_bands": ["B2", "B3", "B4", "B8", "B11", "B12"],  # optional, default RGB
+            "necks": [{"name": "ReshapeTokensToImage"}],
+            "decoder": "UNetDecoder",
+            "decoder_channels": [256, 128, 64, 32],
+            ...
+        }
+        ```
+
+=== "ViT"
+
+    ViTs output one stride-16 scale per block: select four blocks (here of ViT-L's 24) and build a pyramid from them.
+
+    === "YAML"
+        ```yaml
+        model_args:
+          backbone: dinov3_vitl16
+          backbone_ckpt_path: path/to/dinov3_vitl16_pretrain_sat493m.pth
+          backbone_bands: [B2, B3, B4, B8, B11, B12]  # optional, default RGB
+          necks:
+            - name: SelectIndices
+              indices: [5, 11, 17, 23]
+            - name: ReshapeTokensToImage
+            - name: LearnedInterpolateToPyramidal
+          decoder: UNetDecoder
+          decoder_channels: [256, 128, 64, 32]
+          ...
+        ```
+
+    === "Python"
+        ```python
+        model_args = {
+            "backbone": "dinov3_vitl16",
+            "backbone_ckpt_path": "path/to/dinov3_vitl16_pretrain_sat493m.pth",
+            "backbone_bands": ["B2", "B3", "B4", "B8", "B11", "B12"],  # optional, default RGB
+            "necks": [
+                {"name": "SelectIndices", "indices": [5, 11, 17, 23]},
+                {"name": "ReshapeTokensToImage"},
+                {"name": "LearnedInterpolateToPyramidal"},
+            ],
+            "decoder": "UNetDecoder",
+            "decoder_channels": [256, 128, 64, 32],
+            ...
+        }
+        ```
 
 - `bands`: widens the first layer to `len(bands)` channels. The pretrained RGB weights go to `RED`/`GREEN`/`BLUE`
   (or `B04`/`B03`/`B02`), the other channels are randomly initialized.
-- Output: tokens `[B, N, D]` with the class token first, one per ViT block or ConvNeXt stage. For ViTs with a
-  hierarchical decoder, add `SelectIndices` and `LearnedInterpolateToPyramidal` (as for Prithvi).
+- Output: tokens `[B, N, D]` with the class token first, one per ViT block or ConvNeXt stage;
+  `ReshapeTokensToImage` drops the class token and reshapes them to feature maps.
 - `norm` (default `True`) applies the output norms.
 
 ## Tips
@@ -50,9 +93,8 @@ Weights are downloaded from [Meta](https://ai.meta.com/resources/models-and-libr
   `[0.430, 0.411, 0.296]` / std `[0.213, 0.156, 0.143]` for the satellite (SAT-493M) models.
 - **Multispectral input**: only the RGB channels start from pretrained weights; all other bands are learned during
   fine-tuning.
-- **Decoders**: ConvNeXts are hierarchical (strides 4 to 32) and work with a UNet decoder directly. ViTs output a
-  single stride-16 scale and need `SelectIndices` + `ReshapeTokensToImage` + `LearnedInterpolateToPyramidal` for
-  hierarchical decoders.
+- **ViT block indices**: four evenly spaced blocks, e.g. `[2, 5, 8, 11]` for ViT-S/B (12 blocks), `[5, 11, 17, 23]`
+  for ViT-L (24).
 - **Time series**: use the [TemporalWrapper](temporal_wrapper.md) (`backbone_use_temporal: True`).
 - **Offline**: the first build downloads the architecture code via `torch.hub`; afterwards it is loaded from the
   `torch.hub` cache.
