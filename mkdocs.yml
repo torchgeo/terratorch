@@ -90,6 +90,7 @@ nav:
       - Models: guide/models.md  # Overview
       - Model Registry: guide/registry.md
       - Encoder-Decoder Factory: guide/encoder_decoder_factory.md
+      - Galileo: guide/galileo.md
       - TerraMind: guide/terramind.md
       - Prithvi EO: guide/prithvi_eo.md
       - Temporal Wrapper: guide/temporal_wrapper.md
