@@ -15,7 +15,7 @@ class BoundaryMeanIoU(Metric):
     ground, independent of the tile size.
     Intersections and unions are accumulated over the dataset, then averaged over classes with a non-empty union
     (macro) or pooled (micro). Pixels within d of an ``ignore_index`` target are left out, since their contours
-    depend on the missing labels.
+    depend on the missing labels (the reference leaves out only the ignored pixels themselves).
 
     Metric based on https://arxiv.org/abs/2103.16562:
     Cheng, B., Girshick, R., Dollár, P., Berg, A. C., & Kirillov, A. (2021). Boundary IoU: Improving object-centric
