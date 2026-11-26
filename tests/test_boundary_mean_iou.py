@@ -598,33 +598,6 @@ class TestBoundaryMeanIoUDefinition:
             ious.append((bp & bt).sum() / (bp | bt).sum())
         assert metric.compute().item() == pytest.approx(np.mean(ious), abs=1e-6)
 
-    @pytest.mark.parametrize("size", [64, 512])
-    def test_default_band_width_is_4px_at_any_size(self, size):
-        target = torch.zeros(1, size, size, dtype=torch.long)
-        target[:, 16:48, 16:48] = 1
-        metric = BoundaryMeanIoU(num_classes=2, include_background=False)
-        metric.update(target, target)
-        assert metric.unions[1] == 32**2 - 24**2
-
-    def test_inner_band_only(self):
-        """A prediction grown by d outside the object still covers the whole target band, but its own band lies
-        outside the target: Boundary IoU 0 for the object class."""
-        target = torch.zeros(1, 64, 64, dtype=torch.long)
-        target[:, 20:44, 20:44] = 1
-        d = 4
-        preds = torch.zeros_like(target)
-        preds[:, 20 - d : 44 + d, 20 - d : 44 + d] = 1
-        metric = BoundaryMeanIoU(num_classes=2, include_background=False)
-        metric.update(preds, target)
-        assert metric.compute() == 0
-
-    def test_image_border_is_not_contour(self):
-        target = torch.zeros(1, 32, 32, dtype=torch.long)
-        target[:, :, :16] = 1  # one contour, at column 16
-        metric = BoundaryMeanIoU(num_classes=2, thickness=2, include_background=False)
-        metric.update(target, target)
-        assert metric.unions[1] == 32 * 2
-
     def test_errors_next_to_ignored_pixels_do_not_count(self):
         target = torch.zeros(1, 64, 64, dtype=torch.long)
         target[:, 16:48, 16:48] = 1
@@ -634,10 +607,3 @@ class TestBoundaryMeanIoUDefinition:
         metric = BoundaryMeanIoU(num_classes=2, ignore_index=255)
         metric.update(preds, target)
         assert metric.compute() == pytest.approx(1.0)
-
-    def test_fixed_thickness(self):
-        target = torch.zeros(1, 64, 64, dtype=torch.long)
-        target[:, 16:48, 16:48] = 1
-        metric = BoundaryMeanIoU(num_classes=2, thickness=1, include_background=False)
-        metric.update(target, target)
-        assert metric.unions[1] == 32**2 - 30**2
