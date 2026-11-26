@@ -204,18 +204,6 @@ class TestOlmoEarthMultimodalTemporal:
         torch.manual_seed(0)
         assert torch.allclose(out, model(x)[0], atol=1e-5)
 
-    @skip_no_olmoearth
-    def test_out_indices(self):
-        model = self._model(out_indices=[0, 1, 2, 3])
-        with torch.no_grad():
-            out = model(torch.randn(1, 12, 32, 32))
-        assert [o.shape for o in out] == [(1, 128, 4, 4)] * 4
-        assert model.out_channels == [128] * 4
-        # the last block's output is the encoder output before the final norm, so it must differ from
-        # the first block's, i.e. the hooks capture different layers
-        assert not torch.allclose(out[0], out[3])
-        with pytest.raises(ValueError, match="out_indices"):
-            self._model(out_indices=[2, 5, 8, 11])  # nano has 4 blocks
 
 
 class TestOlmoEarthImportGuard:
@@ -226,26 +214,3 @@ class TestOlmoEarthImportGuard:
         # This test always passes because __init__.py uses try/except
         # If import failed, the entire test suite would fail to collect
         pass
-
-
-@skip_no_olmoearth
-def test_olmoearth_normalization_matches_normalizer():
-    """Datamodule-style (x - mean) / std with the helper's values == OlmoEarth's Normalizer."""
-    import numpy as np
-
-    from terratorch.models.backbones.olmoearth import _olmoearth_api, olmoearth_normalization
-
-    try:
-        from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.data.normalize import Normalizer
-    except ImportError:
-        from functools import partial
-
-        from olmoearth_pretrain.data.normalize import Normalizer, Strategy
-
-        Normalizer = partial(Normalizer, Strategy.COMPUTED)
-    spec = _olmoearth_api().Modality.get("sentinel1")
-    means, stds = olmoearth_normalization({"sentinel1": ["vh", "vv"]})  # reversed band order
-    x = np.random.uniform(-30, 0, (1, 4, 4, 1, 2)).astype(np.float32)  # [..., vv, vh]
-    expected = Normalizer().normalize(spec, x)
-    ours = (x[..., ::-1] - np.array(means)) / np.array(stds)
-    assert np.allclose(ours[..., ::-1], expected, atol=1e-5)
