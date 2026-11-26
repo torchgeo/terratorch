@@ -208,6 +208,7 @@ class OlmoEarthBackbone(nn.Module):
         oe = _olmoearth_api()
         ModelID, load_model_from_id, load_model_from_path = oe.ModelID, oe.load_model_from_id, oe.load_model_from_path
         ModalitySpec = oe.Modality
+        self._modality_spec = ModalitySpec  # is_multitemporal in _to_feature_map
 
         self.patch_size = patch_size
         self.input_res = input_res
@@ -284,6 +285,9 @@ class OlmoEarthBackbone(nn.Module):
         self.out_indices = None
         if out_indices:
             depth = len(self.encoder.blocks)
+            if any(i < -depth or i >= depth for i in out_indices):
+                msg = f"out_indices must be between {-depth} and {depth - 1}, got {out_indices}"
+                raise ValueError(msg)
             self.out_indices = [i % depth for i in out_indices]
             self._captured: dict[int, Tensor] = {}
             for i in set(self.out_indices):
@@ -416,7 +420,7 @@ class OlmoEarthBackbone(nn.Module):
             if self.temporal_pooling == "mean":
                 tokens = tokens.mean(dim=3)
             else:
-                if tokens.shape[3] == 1:  # non-multitemporal modality: repeat over time
+                if tokens.shape[3] == 1 and not self._modality_spec.get(name).is_multitemporal:  # e.g. srtm
                     tokens = tokens.expand(-1, -1, -1, self.n_timestamps, -1)
                 if tokens.shape[3] != self.n_timestamps:
                     msg = f"{name}: expected {self.n_timestamps} time steps, got {tokens.shape[3]}"

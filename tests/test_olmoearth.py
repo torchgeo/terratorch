@@ -165,6 +165,8 @@ class TestOlmoEarthMultimodalTemporal:
         assert model.out_channels == [3 * 128]
         with pytest.raises(ValueError, match="time steps"):
             self._model(temporal_pooling="concat", n_timestamps=4)(x)
+        with pytest.raises(ValueError, match="time steps"):  # T=1 imagery is not repeated, only e.g. srtm
+            self._model(temporal_pooling="concat", n_timestamps=4)(x[:, :, :1])
 
     @skip_no_olmoearth
     def test_bands_split_matches_dict_input(self):
@@ -222,6 +224,8 @@ class TestOlmoEarthMultimodalTemporal:
         # the last block's output is the encoder output before the final norm, so it must differ from
         # the first block's, i.e. the hooks capture different layers
         assert not torch.allclose(out[0], out[3])
+        with pytest.raises(ValueError, match="out_indices"):
+            self._model(out_indices=[2, 5, 8, 11])  # nano has 4 blocks
 
 class TestOlmoEarthImportGuard:
     """Test behavior when olmoearth-pretrain is not installed."""
@@ -254,3 +258,15 @@ def test_olmoearth_normalization_matches_normalizer():
     expected = Normalizer().normalize(spec, x)
     ours = (x[..., ::-1] - np.array(means)) / np.array(stds)
     assert np.allclose(ours[..., ::-1], expected, atol=1e-5)
+
+
+@skip_no_olmoearth
+def test_factory_passes_temporal_pooling_to_backbone():
+    """Without the TemporalWrapper, backbone_temporal_pooling reaches the backbone instead of being dropped."""
+    from terratorch.models import EncoderDecoderFactory
+
+    model = EncoderDecoderFactory().build_model(
+        task="segmentation", backbone="olmoearth_v1_nano", backbone_pretrained=False, backbone_patch_size=8,
+        backbone_temporal_pooling="concat", backbone_n_timestamps=4, decoder="FCNDecoder", num_classes=2,
+    )
+    assert model.encoder.out_channels == [4 * 128]

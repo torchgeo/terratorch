@@ -148,7 +148,8 @@ def pad_images(
 
 def _get_backbone(backbone: str | nn.Module, **backbone_kwargs) -> nn.Module:
     use_temporal = backbone_kwargs.pop("use_temporal", False)
-    pooling = backbone_kwargs.pop("temporal_pooling", "mean")
+    # without the wrapper, temporal_pooling is the backbone's own option (e.g. OlmoEarth, Galileo)
+    pooling = backbone_kwargs.pop("temporal_pooling", "mean") if use_temporal else "mean"
     concat = backbone_kwargs.pop("temporal_concat", None)
     n_timestamps = backbone_kwargs.pop("temporal_n_timestamps", None)
     features_permute_op = backbone_kwargs.pop("temporal_features_permute_op", None)
