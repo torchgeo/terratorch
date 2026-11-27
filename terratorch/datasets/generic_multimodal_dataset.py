@@ -408,7 +408,7 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
             )
         elif isinstance(transform, dict):
             # Modality-specific transforms
-            transform = {m: transform[m] if m in transform else default_transform for m in self.modalities}
+            transform = {m: transform.get(m) or default_transform for m in self.modalities}
             self.transform = MultimodalTransforms(transform, shared=False)
         elif transform is None:
             self.transform = MultimodalToTensor(self.modalities)

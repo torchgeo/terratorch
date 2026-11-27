@@ -201,3 +201,46 @@ def test_generic_multimodal_datamodule_missing_mod(dummy_multimodal_data: Path):
     # mod2 not expected to test allow_missing_modalities
 
     gc.collect()
+
+def _dict_transform_datamodule(dummy_multimodal_data: Path, val_transform):
+    from terratorch.datamodules.generic_multimodal_data_module import GenericMultiModalDataModule
+
+    return GenericMultiModalDataModule(
+        modalities=["mod1", "mod2"],
+        task="segmentation",
+        num_classes=2,
+        batch_size=1,
+        train_data_root={m: str(dummy_multimodal_data / "train" / "input") for m in ["mod1", "mod2"]},
+        val_data_root={m: str(dummy_multimodal_data / "val" / "input") for m in ["mod1", "mod2"]},
+        test_data_root={m: str(dummy_multimodal_data / "test" / "input") for m in ["mod1", "mod2"]},
+        image_grep={"mod1": "*_mod1.tif", "mod2": "*_mod2.tif"},
+        label_grep="*tif",
+        train_label_data_root=str(dummy_multimodal_data / "train" / "labels"),
+        val_label_data_root=str(dummy_multimodal_data / "val" / "labels"),
+        test_label_data_root=str(dummy_multimodal_data / "test" / "labels"),
+        allow_substring_file_names=True,
+        means={"mod1": [0.0, 0.0, 0.0], "mod2": [0.0, 0.0, 0.0]},
+        stds={"mod1": [1.0, 1.0, 1.0], "mod2": [1.0, 1.0, 1.0]},
+        num_workers=0,
+        val_transform=val_transform,
+    )
+
+
+# A modality missing from the dict (mod2 in the second case) is only converted to a tensor
+@pytest.mark.parametrize("transformed_modalities", [["mod1", "mod2"], ["mod1"]])
+def test_generic_multimodal_datamodule_dict_transform(dummy_multimodal_data: Path, transformed_modalities):
+    import torch
+    from albumentations.pytorch import ToTensorV2
+
+    val_transform = {m: [ToTensorV2()] for m in transformed_modalities}
+    dm = _dict_transform_datamodule(dummy_multimodal_data, val_transform)
+    dm.setup("fit")
+    sample = dm.val_dataset[0]
+    assert isinstance(sample["mask"], torch.Tensor)
+    assert sample["mask"].dtype == torch.long
+    assert sample["mask"].shape == (16, 16)
+    for m in ["mod1", "mod2"]:
+        assert isinstance(sample["image"][m], torch.Tensor)
+        assert sample["image"][m].shape == (3, 16, 16)
+    batch = next(iter(dm.val_dataloader()))
+    assert batch["mask"].shape == (1, 16, 16)
