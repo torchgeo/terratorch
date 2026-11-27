@@ -1,9 +1,24 @@
 import gc
+import urllib.request
 
 import pytest
 import torch
 
 from terratorch.models.backbones.dinov3.dinov3_wrapper import DinoV3Wrapper
+
+
+def _github_api_reachable() -> bool:
+    try:
+        urllib.request.urlopen("https://api.github.com", timeout=5)
+    except Exception:
+        return False
+    return True
+
+
+# torch.hub validates the GitHub repo via the API before loading, so the tests need it
+pytestmark = pytest.mark.skipif(
+    not _github_api_reachable(), reason="GitHub API unreachable; torch.hub cannot load dinov3"
+)
 
 
 # Fixture for dummy input
