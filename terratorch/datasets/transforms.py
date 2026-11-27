@@ -371,7 +371,8 @@ class MultimodalTransforms:
                         raise NotImplementedError("Non image modalities not implemented.")
                     else:
                         data[key] = self.transforms[key](image=value)["image"]
-
+                elif isinstance(value, np.ndarray):
+                    data[key] = torch.from_numpy(value)
         return data
 
 
