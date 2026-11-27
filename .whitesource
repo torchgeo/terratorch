@@ -4,7 +4,8 @@
     "baseBranches": ["main"]
   },
   "checkRunSettings": {
-    "vulnerableCheckRunConclusionLevel": "neutral"
+    "vulnerableCheckRunConclusionLevel": "failure",
+    "failOnVulnerabilityMinSeverity": "High"
   },
   "issueSettings": {
     "minSeverityLevel": "LOW"
