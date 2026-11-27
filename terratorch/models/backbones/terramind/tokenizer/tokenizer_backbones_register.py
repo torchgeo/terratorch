@@ -47,26 +47,32 @@ __all__ = [
 pretrained_weights = {
     "terramind_v1_tokenizer_s2l2a": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-Tokenizer-S2L2A",
+        "hf_hub_revision": "5a3f80664e0e701232c9526ca21eb7442a40f4be",
         "hf_hub_filename": "TerraMind_Tokenizer_S2L2A.pt",
     },
     "terramind_v1_tokenizer_s1rtc": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-Tokenizer-S1RTC",
+        "hf_hub_revision": "ea54d732d904c804b01e04cb5d85a462598bb9d0",
         "hf_hub_filename": "TerraMind_Tokenizer_S1RTC.pt",
     },
     "terramind_v1_tokenizer_s1grd": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-Tokenizer-S1GRD",
+        "hf_hub_revision": "38937fd35012c2dcf81987b400cec725b5eb0466",
         "hf_hub_filename": "TerraMind_Tokenizer_S1GRD.pt",
     },
     "terramind_v1_tokenizer_dem": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-Tokenizer-DEM",
+        "hf_hub_revision": "aba0a5650a19eb82283e52ce59320c38c41f1e56",
         "hf_hub_filename": "TerraMind_Tokenizer_DEM.pt",
     },
     "terramind_v1_tokenizer_lulc": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-Tokenizer-LULC",
+        "hf_hub_revision": "af6b7c73a36994e25df156e793901969efe88ec9",
         "hf_hub_filename": "TerraMind_Tokenizer_LULC.pt",
     },
     "terramind_v1_tokenizer_ndvi": {
         "hf_hub_id": "ibm-esa-geospatial/TerraMind-1.0-Tokenizer-NDVI",
+        "hf_hub_revision": "e1bd3b4d18023a7438221dbd6953e000cdc2dea5",
         "hf_hub_filename": "TerraMind_Tokenizer_NDVI.pt",
     },
 }
@@ -105,7 +111,9 @@ def build_vqvae(variant: str = None, pretrained: bool = False, ckpt_path: str | 
     elif pretrained:
         # Load model from Hugging Face
         state_dict_file = hf_hub_download(
-            repo_id=pretrained_weights[variant]["hf_hub_id"], filename=pretrained_weights[variant]["hf_hub_filename"]
+            repo_id=pretrained_weights[variant]["hf_hub_id"],
+            filename=pretrained_weights[variant]["hf_hub_filename"],
+            revision=pretrained_weights[variant].get("hf_hub_revision"),
         )
         state_dict = torch.load(state_dict_file, map_location="cpu", weights_only=True)
         state_dict = checkpoint_filter_fn(state_dict)

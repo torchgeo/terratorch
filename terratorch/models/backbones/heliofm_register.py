@@ -25,7 +25,12 @@ def load_weights(model: nn.Module, ckpt_data: dict, **kwargs) -> nn.Module:
     logging.getLogger("terratorch").info("Loading weights.")
 
     if ckpt_data is not None:
-        ckpt_data = huggingface_hub.hf_hub_download(**ckpt_data)
+        download_kwargs = dict(ckpt_data)
+        revision = download_kwargs.pop("revision", None)
+        ckpt_data = huggingface_hub.hf_hub_download(
+            **download_kwargs,
+            revision=revision,  # nosec B615 - pinned in remote_checkpoint_path
+        )
 
         checkpoint_model = torch.load(ckpt_data, map_location="cpu", weights_only=True)
 
@@ -61,7 +66,11 @@ def heliofm_backbone_surya(
     pretrained: bool = False,
     dtype="bfloat16",
 ):
-    remote_checkpoint_path = {"repo_id": "nasa-ibm-ai4science/Surya-1.0", "filename": "surya.366m.v1.pt"}
+    remote_checkpoint_path = {
+        "repo_id": "nasa-ibm-ai4science/Surya-1.0",
+        "filename": "surya.366m.v1.pt",
+        "revision": "5cc4b5386d5f78fda3896b1389589d4e173bf212",
+    }
 
     if not ckpt_data:
         ckpt_data = remote_checkpoint_path

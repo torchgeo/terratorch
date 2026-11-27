@@ -35,7 +35,7 @@ def _compute_cache_key(
 ) -> str:
     """Compute a unique hash for cache validation."""
     config = f"{base_len}_{tile_size}_{overlap}_{patch_size}_{padding}"
-    return hashlib.md5(config.encode()).hexdigest()
+    return hashlib.md5(config.encode(), usedforsecurity=False).hexdigest()
 
 
 class TiledDataset(Dataset):

@@ -16,7 +16,7 @@ def get_commit_from_github(repo="vllm-project/vllm", branch="main"):
     try:
         req = urllib.request.Request(api_url)
         req.add_header("Accept", "application/vnd.github.v3+json")
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:  # nosec B310 - hardcoded https URL
             data = json.loads(response.read().decode())
             return data["sha"], data["sha"][:9]
     except Exception as e:
@@ -67,8 +67,8 @@ def main():
         has_wheel = False
 
         try:
-            urllib.request.urlopen(commit_url, timeout=5)
-            html = urllib.request.urlopen(commit_url).read().decode()
+            with urllib.request.urlopen(commit_url, timeout=5) as response:  # nosec B310 - hardcoded https URL
+                html = response.read().decode()
             wheel_match = re.search(r'href="([^"]*x86_64[^"]*\.whl)"', html)
             has_wheel = wheel_match is not None
         except Exception:
@@ -90,7 +90,7 @@ def main():
 
     for attempt in range(1, max_retries + 1):
         try:
-            html = urllib.request.urlopen("https://wheels.vllm.ai/nightly/cu129/vllm/", timeout=10).read().decode()
+            html = urllib.request.urlopen("https://wheels.vllm.ai/nightly/cu129/vllm/", timeout=10).read().decode()  # nosec B310 - hardcoded https URL
 
             # Look for all wheel links and find the most recent one
             wheel_matches = re.findall(r'href="([^"]*x86_64[^"]*\.whl)"', html)

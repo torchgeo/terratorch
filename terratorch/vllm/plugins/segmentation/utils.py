@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import aiohttp
 from anyio import open_file
 from terratorch.cli_tools import is_one_band
+from terratorch.utils import check_url_scheme
 from rasterio import MemoryFile
 
 async def download_file_async(url: str, dest_file: Path | None = None) -> BytesIO | None:
@@ -26,7 +27,7 @@ async def read_file_async(path: str) -> BytesIO:
         return BytesIO(contents)
 
 def download_file_sync(url: str, dest_file: Path | None = None) -> BytesIO | None:
-    with urllib.request.urlopen(url) as response:
+    with urllib.request.urlopen(check_url_scheme(url)) as response:  # nosec B310 - scheme allowlisted above
         data = response.read()
     if dest_file:
         dest_file.write_bytes(data)

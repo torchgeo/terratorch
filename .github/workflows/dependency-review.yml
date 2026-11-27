@@ -1,0 +1,28 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          # GHSA-fc5q-39xc-vjpf: picomatch ReDoS, affects <= 4.0.7 and no patched
+          # version exists yet (4.0.7 is the current latest). Remove this entry
+          # once upstream publishes a fix and the override is bumped.
+          allow-ghsas: GHSA-fc5q-39xc-vjpf

@@ -94,30 +94,37 @@ prithvi_cfgs = {
 pretrained_weights = {
     "prithvi_eo_v1_100": {
         "hf_hub_id": "ibm-nasa-geospatial/Prithvi-EO-1.0-100M",
+        "hf_hub_revision": "f3a9ea7a1723621b0aeceb4de993093704d712c5",
         "hf_hub_filename": "Prithvi_EO_V1_100M.pt",
     },
     "prithvi_eo_v2_tiny_tl": {
         "hf_hub_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-tiny-TL",
+        "hf_hub_revision": "335eadc2c45ad5abe7bd307223e1c48c5b60c41b",
         "hf_hub_filename": "Prithvi_EO_V2_tiny_TL.pt",
     },
     "prithvi_eo_v2_100_tl": {
         "hf_hub_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-100M-TL",
+        "hf_hub_revision": "2c84e383194986040f883cc43d7869002c425e1b",
         "hf_hub_filename": "Prithvi_EO_V2_100M_TL.pt",
     },
     "prithvi_eo_v2_300": {
         "hf_hub_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M",
+        "hf_hub_revision": "9eb1b1102806593963daa333bcc491b1c6f8562f",
         "hf_hub_filename": "Prithvi_EO_V2_300M.pt",
     },
     "prithvi_eo_v2_300_tl": {
         "hf_hub_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL",
+        "hf_hub_revision": "63adbd39c271da4c42f447e69b1a7c91a338cdc9",
         "hf_hub_filename": "Prithvi_EO_V2_300M_TL.pt",
     },
     "prithvi_eo_v2_600": {
         "hf_hub_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-600M",
+        "hf_hub_revision": "2a5cf6cedea1c0b31734021e2a5ac90082825414",
         "hf_hub_filename": "Prithvi_EO_V2_600M.pt",
     },
     "prithvi_eo_v2_600_tl": {
         "hf_hub_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-600M-TL",
+        "hf_hub_revision": "3d72adc6dfc4cc3862bf4f41da8c83db267193c9",
         "hf_hub_filename": "Prithvi_EO_V2_600M_TL.pt",
     },
 }
@@ -346,6 +353,7 @@ def _create_prithvi(
                 pretrained_path = hf_hub_download(
                     repo_id=pretrained_weights[variant]["hf_hub_id"],
                     filename=pretrained_weights[variant]["hf_hub_filename"],
+                    revision=pretrained_weights[variant].get("hf_hub_revision"),
                 )
                 state_dict = torch.load(pretrained_path, map_location="cpu", weights_only=True)
                 state_dict = checkpoint_filter_wrapper_fn(state_dict, model, pretrained_bands, model_bands)

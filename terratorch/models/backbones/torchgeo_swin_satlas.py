@@ -15,6 +15,7 @@ from torchvision.models._api import Weights, WeightsEnum
 from terratorch.datasets.utils import OpticalBands, SARBands
 from terratorch.models.backbones.select_patch_embed_weights import select_patch_embed_weights
 from terratorch.registry import TERRATORCH_BACKBONE_REGISTRY
+from terratorch.utils import parse_hf_url
 
 
 class SwinEncoderWrapper(nn.Module):
@@ -502,9 +503,12 @@ def load_swin_weights(
 
     if ckpt_data is not None:
         if ckpt_data.find("https://hf.co/") > -1:
-            repo_id = ckpt_data.split("/resolve/", maxsplit=1)[0].replace("https://hf.co/", "")
-            filename = ckpt_data.rsplit("/", maxsplit=1)[-1]
-            ckpt_data = huggingface_hub.hf_hub_download(repo_id=repo_id, filename=filename)
+            repo_id, revision, filename = parse_hf_url(ckpt_data)
+            ckpt_data = huggingface_hub.hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                revision=revision,  # nosec B615 - revision comes from the user-supplied URL
+            )
 
         checkpoint_model = torch.load(ckpt_data, map_location="cpu", weights_only=True)
         state_dict = model.state_dict()
